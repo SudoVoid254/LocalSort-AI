@@ -57,6 +57,46 @@ class LocalSortApp {
 
         if (newState === 'CONFIG') {
             this.ui.renderRules(this.config.rules);
+        } else if (newState === 'PREVIEW') {
+            await this.generatePreview();
+        }
+    }
+
+    async generatePreview() {
+        // Current Structure
+        const currentTree = {};
+        for (const [name, data] of this.appState.processedFiles.entries()) {
+            this.addToTree(currentTree, data.originalPath, name);
+        }
+        this.ui.renderTree('current-tree', currentTree);
+
+        // Proposed Structure
+        const proposedTree = {};
+        for (const [name, data] of this.appState.processedFiles.entries()) {
+            const targetPath = this.config.calculatePath(data);
+            if (targetPath) {
+                this.addToTree(proposedTree, targetPath, name);
+            } else {
+                this.addToTree(proposedTree, 'Unorganized', name);
+            }
+        }
+        this.ui.renderTree('proposed-tree', proposedTree);
+    }
+
+    addToTree(tree, path, fileName) {
+        const parts = path.split('/');
+        let current = tree;
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            if (!part) continue;
+            if (i === parts.length - 1) {
+                // It's the leaf directory or the file's target folder
+                if (!current[part]) current[part] = { type: 'directory', children: {} };
+                current[part].children[fileName] = { type: 'file' };
+            } else {
+                if (!current[part]) current[part] = { type: 'directory', children: {} };
+                current = current[part].children;
+            }
         }
     }
 

@@ -49,10 +49,10 @@ export class FSManager {
         await writable.close();
 
         // 4. Remove source file
-        // This requires the parent directory handle of the source file
+        // Fixed: provide an empty object for options instead of leaving it blank
         const parentPath = sourcePath.substring(0, sourcePath.lastIndexOf('/'));
         const parentHandle = await this.getDirectoryHandleByPath(this.rootHandle, parentPath);
-        await parentHandle.remove(fileName);
+        await parentHandle.remove(fileName, {});
 
         return { sourcePath, targetPath: `${targetPath}/${fileName}` };
     }

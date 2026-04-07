@@ -49,8 +49,6 @@ export class UIHandler {
         }
     }
 
-
-
     updateStepper(state) {
         this.stepperSteps.forEach(step => {
             step.classList.toggle('active', step.dataset.step === state);
@@ -85,18 +83,31 @@ export class UIHandler {
         rules.forEach((rule, index) => {
             const div = document.createElement('div');
             div.className = 'rule-item';
-            div.style.marginBottom = '10px';
+            div.style.marginBottom = '15px';
             div.style.display = 'flex';
             div.style.alignItems = 'center';
             div.style.gap = '10px';
             div.style.justifyContent = 'center';
+            div.style.background = '#fcfcfc';
+            div.style.padding = '10px';
+            div.style.border = '1px solid #eee';
+            div.style.borderRadius = '4px';
 
             div.innerHTML = `
                 <div class="rule-row">
-                    <span>If label matches </span>
-                    <input type="text" class="rule-input" value="${rule.pattern}" data-index="${index}" data-field="pattern" style="width: 80px; padding: 2px 5px;">
-                    <span> $\to$ move to </span>
-                    <input type="text" class="rule-input" value="${rule.target}" data-index="${index}" data-field="target" style="width: 150px; padding: 2px 5px;">
+                    <span style="font-size: 0.9rem">If label is </span>
+                    <select class="rule-input" data-index="${index}" data-field="pattern" style="padding: 4px;">
+                        <option value=".*" ${rule.pattern === '.*' ? 'selected' : ''}>Any Label</option>
+                        <option value="people" ${rule.pattern === 'people' ? 'selected' : ''}>People</option>
+                        <option value="landscape" ${rule.pattern === 'landscape' ? 'selected' : ''}>Landscape</option>
+                        <option value="indoor" ${rule.pattern === 'indoor' ? 'selected' : ''}>Indoor</option>
+                        <option value="outdoor" ${rule.pattern === 'outdoor' ? 'selected' : ''}>Outdoor</option>
+                        <option value="nature" ${rule.pattern === 'nature' ? 'selected' : ''}>Nature</option>
+                        <option value="video" ${rule.pattern === 'video' ? 'selected' : ''}>Videos</option>
+                        <option value="unknown" ${rule.pattern === 'unknown' ? 'selected' : ''}>Unknown</option>
+                    </select>
+                    <span style="font-size: 0.9rem"> $\to$ move to </span>
+                    <input type="text" class="rule-input" value="${rule.target}" data-index="${index}" data-field="target" style="width: 150px; padding: 4px;">
                     <button class="secondary-btn btn-sm" data-index="${index}" style="margin-left: 10px; padding: 5px 10px;">Delete</button>
                 </div>
             `;
@@ -122,5 +133,34 @@ export class UIHandler {
                 this.renderRules(this.app.config.rules);
             });
         });
+    }
+
+    renderTree(containerId, tree) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+
+        if (Object.keys(tree).length === 0) {
+            container.innerHTML = 'No files to display';
+            return;
+        }
+
+        const renderNode = (name, node, depth = 0) => {
+            const indent = '  '.repeat(depth);
+            if (node.type === 'directory') {
+                let html = `${indent}📁 ${name}/\n`;
+                for (const childName in node.children) {
+                    html += renderNode(childName, node.children[childName], depth + 1);
+                }
+                return html;
+            } else {
+                return `${indent}📄 ${name}\n`;
+            }
+        };
+
+        let fullTree = '';
+        for (const name in tree) {
+            fullTree += renderNode(name, tree[name]);
+        }
+        container.textContent = fullTree;
     }
 }
