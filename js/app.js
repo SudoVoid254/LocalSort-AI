@@ -80,6 +80,19 @@ class LocalSortApp {
             return;
         }
 
+        // Wait for AI Engine to be ready if it isn't already
+        if (!this.ai.isReady) {
+            this.ui.updateStatus('label-status', 'Waiting for AI model to load...');
+            await new Promise((resolve) => {
+                const checkInterval = setInterval(() => {
+                    if (this.ai.isReady) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 500);
+            });
+        }
+
         this.ui.updateStatusBar('ai-status', '🧠 AI: Analyzing...');
 
         for (let i = 0; i < files.length; i++) {
