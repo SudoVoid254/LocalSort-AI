@@ -46,8 +46,6 @@ export class AIEngine {
                 return;
             }
 
-            const requestId = Math.random().toString(36).substring(7);
-
             const handler = (e) => {
                 const { type, payload } = e.data;
                 if (type === 'RESULT') {
@@ -62,7 +60,7 @@ export class AIEngine {
             this.worker.addEventListener('message', handler);
             this.worker.postMessage({
                 type: 'LABEL',
-                payload: { imageBlob, labels: customLabels }
+                payload: { imageBlob: fileBlob, labels: customLabels }
             });
         });
     }
