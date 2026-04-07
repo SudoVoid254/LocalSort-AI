@@ -68,6 +68,8 @@ export class AIEngine {
                 payload: { imageBlob: fileBlob, labels: labelsToUse }
             });
         });
+    }
+
     async extractVideoFrame(videoBlob) {
         return new Promise((resolve, reject) => {
             const video = document.createElement('video');
