@@ -53,13 +53,15 @@ export class FSManager {
         const parentHandle = await this.getDirectoryHandleByPath(this.rootHandle, parentPath);
 
         try {
-            // Try standard remove with options object
-            await parentHandle.remove(fileName, {});
+            // Attempt a a simpler remove call.
+            // Some versions of Chrome/Edge fail if the second argument is provided,
+            // while others fail if it's missing.
+            // We use a more primitive try-catch sequence.
+
+            await parentHandle.remove(fileName);
         } catch (e) {
-            console.warn('Standard remove failed, trying fallback remove...', e);
-            // Fallback for different browser versions
             try {
-                await parentHandle.remove(fileName);
+                await parentHandle.remove(fileName, {});
             } catch (fallbackErr) {
                 throw new Error(`Could not remove original file ${fileName}: ${fallbackErr.message}`);
             }
