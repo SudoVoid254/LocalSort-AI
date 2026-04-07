@@ -68,6 +68,42 @@ export class AIEngine {
                 payload: { imageBlob: fileBlob, labels: labelsToUse }
             });
         });
+    async extractVideoFrame(videoBlob) {
+        return new Promise((resolve, reject) => {
+            const video = document.createElement('video');
+            video.muted = true;
+            video.playsInline = true;
+
+            const url = URL.createObjectURL(videoBlob);
+            video.src = url;
+
+            video.onloadeddata = async () => {
+                // Seek to 10% of duration to avoid black frames at the start
+                video.currentTime = video.duration * 0.1;
+            };
+
+            video.onseeked = async () => {
+                try {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0);
+
+                    const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+                    URL.revokeObjectURL(url);
+                    resolve(blob);
+                } catch (err) {
+                    URL.revokeObjectURL(url);
+                    reject(err);
+                }
+            };
+
+            video.onerror = (err) => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Video loading failed'));
+            };
+        });
     }
 }
 

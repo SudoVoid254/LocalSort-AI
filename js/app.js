@@ -107,6 +107,11 @@ class LocalSortApp {
         current[fileName] = { type: 'file' };
     }
 
+    async handleUpdateLabels(labelsString) {
+        this.customLabels = labelsString.split(',').map(l => l.trim()).filter(l => l);
+        this.ui.updateStatusBar('ai-status', `🧠 AI: Labels Updated`);
+    }
+
     async handleSelectFolder() {
         try {
             const handle = await this.fs.selectDirectory();
@@ -162,18 +167,32 @@ class LocalSortApp {
                 const file = await fileInfo.handle.getFile();
 
                 if (fileInfo.name.match(/\.(mp4|mov)$/i)) {
-                    this.appState.processedFiles.set(fileInfo.name, {
-                        labels: ['video'],
-                        originalPath: fileInfo.path,
-                        handle: fileInfo.handle
-                    });
-                    const msg = `Skipped ${fileInfo.name}: Video file (labeled as video)`;
-                    this.ui.updateStatus('label-status', msg);
-                    this.ui.addLogEntry(msg);
+                    try {
+                        const videoFile = await fileInfo.handle.getFile();
+                        const frameBlob = await this.ai.extractVideoFrame(videoFile);
+                        const result = await this.ai.labelImage(frameBlob, this.customLabels);
+
+                        this.appState.processedFiles.set(fileInfo.name, {
+                            labels: [result.label],
+                            originalPath: fileInfo.path,
+                            handle: fileInfo.handle
+                        });
+                        const msg = `Labeled video ${fileInfo.name} as ${result.label}`;
+                        this.ui.updateStatus('label-status', msg);
+                        this.ui.addLogEntry(msg);
+                    } catch (err) {
+                        console.error(`Failed to process video ${fileInfo.name}:`, err);
+                        this.appState.processedFiles.set(fileInfo.name, {
+                            labels: ['video'],
+                            originalPath: fileInfo.path,
+                            handle: fileInfo.handle
+                        });
+                        this.ui.addLogEntry(`Error processing video ${fileInfo.name}: ${err.message}`);
+                    }
                     continue;
                 }
 
-                const result = await this.ai.labelImage(file);
+                const result = await this.ai.labelImage(file, this.customLabels);
 
                 this.appState.processedFiles.set(fileInfo.name, {
                     labels: [result.label],

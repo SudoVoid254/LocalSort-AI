@@ -16,7 +16,9 @@ self.onmessage = async (e) => {
     if (type === 'INIT') {
         try {
             self.postMessage({ type: 'STATUS', payload: 'Loading CLIP model...' });
-            classifier = await pipeline('zero-shot-image-classification', 'Xenova/clip-vit-base-patch32');
+            classifier = await pipeline('zero-shot-image-classification', 'Xenova/clip-vit-base-patch32', {
+                device: 'webgpu'
+            });
             self.postMessage({ type: 'READY' });
         } catch (err) {
             self.postMessage({ type: 'ERROR', payload: err.message });

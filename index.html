@@ -25,6 +25,18 @@
                 <div class="card">
                     <h2>Select Media Folder</h2>
                     <p>Choose the directory containing the photos and videos you want to organize. Everything stays local.</p>
+
+                    <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; text-align: left;">
+                        <label style="font-size: 0.9rem; font-weight: bold;">Custom AI Labels (comma separated):</label>
+                        <div style="display: flex; gap: 10px; margin-top: 5px;">
+                            <input type="text" id="custom-labels-input" placeholder="e.g. beach, mountain, wedding" style="flex: 1; padding: 8px;">
+                            <button id="btn-update-labels" class="primary-btn" style="padding: 8px 15px;">Set Labels</button>
+                        </div>
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin: 5px 0 0 0;">
+                            The AI will use these categories for the analysis. Leave blank for defaults.
+                        </p>
+                    </div>
+
                     <button id="btn-select-folder" class="primary-btn">Select Folder</button>
                 </div>
             </section>
@@ -48,18 +60,6 @@
                     <h2>Sorting Configuration</h2>
                     <p>Define how you want your files organized.</p>
                     <div id="config-help"></div>
-
-                    <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
-                        <label style="font-size: 0.9rem; font-weight: bold;">Custom AI Labels (comma separated):</label>
-                        <div style="display: flex; gap: 10px; margin-top: 5px;">
-                            <input type="text" id="custom-labels-input" placeholder="e.g. beach, mountain, wedding" style="flex: 1; padding: 8px;">
-                            <button id="btn-save-labels" class="primary-btn" style="padding: 8px 15px;">Update Labels</button>
-                        </div>
-                        <p style="font-size: 0.75rem; color: var(--text-muted); margin: 5px 0 0 0;">
-                            The AI will use these categories instead of the defaults.
-                        </p>
-                    </div>
-
                     <div id="rules-container"></div>
                     <button id="btn-add-rule" class="secondary-btn">+ Add Rule</button>
                     <div class="actions">
