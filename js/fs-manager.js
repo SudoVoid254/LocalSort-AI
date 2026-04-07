@@ -33,39 +33,18 @@ export class FSManager {
     }
 
     async moveFile(sourceHandle, sourcePath, targetPath) {
-        // Implementation: Copy -> Delete
-        // 1. Create target directory structure
         const targetDir = await this.ensureDirectoryPath(this.rootHandle, targetPath);
 
-        // 2. Get source file content
         const sourceFile = await sourceHandle.getFile();
         const content = await sourceFile.arrayBuffer();
 
-        // 3. Write file content to target
         const fileName = sourceHandle.name;
         const newFileHandle = await targetDir.getFileHandle(fileName, { create: true });
         const writable = await newFileHandle.createWritable();
         await writable.write(content);
         await writable.close();
 
-        // 4. Remove source file
-        const parentPath = sourcePath.substring(0, sourcePath.lastIndexOf('/'));
-        const parentHandle = await this.getDirectoryHandleByPath(this.rootHandle, parentPath);
-
-        try {
-            // Attempt a a simpler remove call.
-            // Some versions of Chrome/Edge fail if the second argument is provided,
-            // while others fail if it's missing.
-            // We use a more primitive try-catch sequence.
-
-            await parentHandle.remove(fileName);
-        } catch (e) {
-            try {
-                await parentHandle.remove(fileName, {});
-            } catch (fallbackErr) {
-                throw new Error(`Could not remove original file ${fileName}: ${fallbackErr.message}`);
-            }
-        }
+        await sourceHandle.remove({ recursive: false });
 
         return { sourcePath, targetPath: `${targetPath}/${fileName}` };
     }
