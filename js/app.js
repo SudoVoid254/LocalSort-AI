@@ -126,6 +126,8 @@ class LocalSortApp {
             this.appState.processedFiles.clear();
             this.updateState('INPUT');
         }, 3000);
+    }
+
     async handleRollback() {
         if (this.appState.transactionLog.length === 0) {
             alert('No changes to rollback.');
@@ -147,3 +149,6 @@ class LocalSortApp {
         this.appState.transactionLog = [];
         setTimeout(() => this.updateState('INPUT'), 3000);
     }
+}
+
+window.app = new LocalSortApp();
