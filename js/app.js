@@ -175,7 +175,8 @@ class LocalSortApp {
                         this.appState.processedFiles.set(fileInfo.name, {
                             labels: [result.label],
                             originalPath: fileInfo.path,
-                            handle: fileInfo.handle
+                            handle: fileInfo.handle,
+                            date: null // Videos often lack standard EXIF date, fallback to file date in config-store
                         });
                         const msg = `Labeled video ${fileInfo.name} as ${result.label}`;
                         this.ui.updateStatus('label-status', msg);
@@ -185,7 +186,8 @@ class LocalSortApp {
                         this.appState.processedFiles.set(fileInfo.name, {
                             labels: ['video'],
                             originalPath: fileInfo.path,
-                            handle: fileInfo.handle
+                            handle: fileInfo.handle,
+                            date: null
                         });
                         this.ui.addLogEntry(`Error processing video ${fileInfo.name}: ${err.message}`);
                     }
@@ -193,11 +195,13 @@ class LocalSortApp {
                 }
 
                 const result = await this.ai.labelImage(file, this.customLabels);
+                const captureDate = await this.fs.extractExifDate(file);
 
                 this.appState.processedFiles.set(fileInfo.name, {
                     labels: [result.label],
                     originalPath: fileInfo.path,
-                    handle: fileInfo.handle
+                    handle: fileInfo.handle,
+                    date: captureDate
                 });
                 const msg = `Labeled ${fileInfo.name} as ${result.label}`;
                 this.ui.updateStatus('label-status', msg);
@@ -207,7 +211,8 @@ class LocalSortApp {
                 this.appState.processedFiles.set(fileInfo.name, {
                     labels: ['unknown'],
                     originalPath: fileInfo.path,
-                    handle: fileInfo.handle
+                    handle: fileInfo.handle,
+                    date: null
                 });
                 const msg = `Error labeling ${fileInfo.name}: ${err.message}`;
                 this.ui.updateStatus('label-status', msg);

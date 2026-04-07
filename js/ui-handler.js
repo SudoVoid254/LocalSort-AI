@@ -132,12 +132,9 @@ export class UIHandler {
                     <span style="font-size: 0.9rem">If label is </span>
                     <select class="rule-input" data-index="${index}" data-field="pattern" style="padding: 4px;">
                         <option value=".*" ${rule.pattern === '.*' ? 'selected' : ''}>Any Label</option>
-                        <option value="people" ${rule.pattern === 'people' ? 'selected' : ''}>People</option>
-                        <option value="landscape" ${rule.pattern === 'landscape' ? 'selected' : ''}>Landscape</option>
-                        <option value="indoor" ${rule.pattern === 'indoor' ? 'selected' : ''}>Indoor</option>
-                        <option value="outdoor" ${rule.pattern === 'outdoor' ? 'selected' : ''}>Outdoor</option>
-                        <option value="nature" ${rule.pattern === 'nature' ? 'selected' : ''}>Nature</option>
-                        <option value="video" ${rule.pattern === 'video' ? 'selected' : ''}>Videos</option>
+                        ${(this.app.customLabels || this.app.ai.defaultLabels).map(label =>
+                            `<option value="${label}" ${rule.pattern === label ? 'selected' : ''}>${label.charAt(0).toUpperCase() + label.slice(1)}</option>`
+                        ).join('')}
                         <option value="unknown" ${rule.pattern === 'unknown' ? 'selected' : ''}>Unknown</option>
                     </select>
                     <span style="font-size: 0.9rem"> $\to$ move to </span>
@@ -196,5 +193,50 @@ export class UIHandler {
             fullTree += renderNode(name, tree[name]);
         }
         container.textContent = fullTree;
+    }
+
+    async renderGallery(processedFiles, onLabelChange) {
+        const container = document.getElementById('preview-gallery');
+        container.innerHTML = '';
+
+        for (const [fileName, data] of processedFiles.entries()) {
+            const wrapper = document.createElement('div');
+            wrapper.style.textAlign = 'center';
+            wrapper.style.fontSize = '0.8rem';
+
+            const img = document.createElement('img');
+            img.style.width = '100px';
+            img.style.height = '100px';
+            img.style.objectFit = 'cover';
+            img.style.borderRadius = '4px';
+            img.style.border = '1px solid #ddd';
+            img.style.cursor = 'pointer';
+
+            // In a real FS Access API app, we'd create a URL from the handle
+            // For this demo, we'll try to get the file and create a blob URL
+            try {
+                const file = await data.handle.getFile();
+                img.src = URL.createObjectURL(file);
+            } catch (e) {
+                img.src = 'https://via.placeholder.com/100?text=No+Preview';
+            }
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = data.labels[0] || '';
+            input.style.width = '90px';
+            input.style.fontSize = '0.7rem';
+            input.style.marginTop = '5px';
+            input.style.textAlign = 'center';
+
+            input.addEventListener('change', (e) => {
+                onLabelChange(fileName, e.target.value);
+            });
+
+            wrapper.appendChild(img);
+            wrapper.appendChild(document.createElement('br'));
+            wrapper.appendChild(input);
+            container.appendChild(wrapper);
+        }
     }
 }
