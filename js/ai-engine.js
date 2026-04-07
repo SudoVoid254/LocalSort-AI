@@ -10,7 +10,13 @@ export class AIEngine {
     }
 
     async init(onStatus, onReady) {
-        this.worker = new Worker('/js/ai-worker.js', { type: 'module' });
+        try {
+            this.worker = new Worker('./js/ai-worker.js', { type: 'module' });
+        } catch (err) {
+            console.error('Failed to create worker:', err);
+            onStatus('Worker Creation Failed');
+            return;
+        }
 
         this.worker.onmessage = (e) => {
             const { type, payload } = e.data;
@@ -19,7 +25,15 @@ export class AIEngine {
                 this.isReady = true;
                 onReady();
             }
-            if (type === 'ERROR') console.error('AI Worker Error:', payload);
+            if (type === 'ERROR') {
+                console.error('AI Worker Error:', payload);
+                onStatus(`Error: ${payload}`);
+            }
+        };
+
+        this.worker.onerror = (err) => {
+            console.error('Worker global error:', err);
+            onStatus('Worker Crash');
         };
 
         this.worker.postMessage({ type: 'INIT' });
