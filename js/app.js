@@ -116,7 +116,13 @@ class LocalSortApp {
 
                 // CLIP cannot decode video files directly. We should only pass images.
                 if (fileInfo.name.match(/\.(mp4|mov)$/i)) {
-                    throw new Error('Videos are not supported for labeling yet');
+                    this.appState.processedFiles.set(fileInfo.name, {
+                        labels: ['video'],
+                        originalPath: fileInfo.path,
+                        handle: fileInfo.handle
+                    });
+                    this.ui.updateStatus('label-status', `Skipped ${fileInfo.name}: Video file`);
+                    continue;
                 }
 
                 const result = await this.ai.labelImage(file);
@@ -134,7 +140,7 @@ class LocalSortApp {
                     originalPath: fileInfo.path,
                     handle: fileInfo.handle
                 });
-                this.ui.updateStatus('label-status', `Skipped ${fileInfo.name}: ${err.message}`);
+                this.ui.updateStatus('label-status', `Error labeling ${fileInfo.name}`);
             }
             // Brief pause to make the UI feedback readable
             await new Promise(r => setTimeout(r, 100));

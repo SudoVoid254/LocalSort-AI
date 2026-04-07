@@ -85,13 +85,34 @@ export class UIHandler {
         rules.forEach((rule, index) => {
             const div = document.createElement('div');
             div.className = 'rule-item';
+            div.style.marginBottom = '10px';
+            div.style.display = 'flex';
+            div.style.alignItems = 'center';
+            div.style.gap = '10px';
+            div.style.justifyContent = 'center';
+
             div.innerHTML = `
                 <div class="rule-row">
-                    <span>If label matches <strong>${rule.pattern}</strong> $\to$ move to <strong>${rule.target}</strong></span>
-                    <button class="secondary-btn btn-sm" data-index="${index}">Delete</button>
+                    <span>If label matches </span>
+                    <input type="text" class="rule-input" value="${rule.pattern}" data-index="${index}" data-field="pattern" style="width: 80px; padding: 2px 5px;">
+                    <span> $\to$ move to </span>
+                    <input type="text" class="rule-input" value="${rule.target}" data-index="${index}" data-field="target" style="width: 150px; padding: 2px 5px;">
+                    <button class="secondary-btn btn-sm" data-index="${index}" style="margin-left: 10px; padding: 5px 10px;">Delete</button>
                 </div>
             `;
             container.appendChild(div);
+        });
+
+        container.querySelectorAll('.rule-input').forEach(input => {
+            input.addEventListener('change', (e) => {
+                const index = e.target.dataset.index;
+                const field = e.target.dataset.field;
+                const value = e.target.value;
+
+                const rules = [...this.app.config.rules];
+                rules[index][field] = value;
+                this.app.config.saveRules(rules);
+            });
         });
 
         container.querySelectorAll('.btn-sm').forEach(btn => {
