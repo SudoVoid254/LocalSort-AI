@@ -49,10 +49,21 @@ export class FSManager {
         await writable.close();
 
         // 4. Remove source file
-        // Fixed: provide an empty object for options instead of leaving it blank
         const parentPath = sourcePath.substring(0, sourcePath.lastIndexOf('/'));
         const parentHandle = await this.getDirectoryHandleByPath(this.rootHandle, parentPath);
-        await parentHandle.remove(fileName, {});
+
+        try {
+            // Try standard remove with options object
+            await parentHandle.remove(fileName, {});
+        } catch (e) {
+            console.warn('Standard remove failed, trying fallback remove...', e);
+            // Fallback for different browser versions
+            try {
+                await parentHandle.remove(fileName);
+            } catch (fallbackErr) {
+                throw new Error(`Could not remove original file ${fileName}: ${fallbackErr.message}`);
+            }
+        }
 
         return { sourcePath, targetPath: `${targetPath}/${fileName}` };
     }
