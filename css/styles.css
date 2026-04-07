@@ -168,10 +168,14 @@ h1 {
 }
 
 .tree-view {
-    white-space: pre;
-    font-size: 0.85rem;
-    overflow-y: auto;
     max-height: 400px;
+    overflow-y: auto;
+    font-family: monospace;
+    white-space: pre;
+    background: #212529;
+    color: #00ff00;
+    padding: 10px;
+    border-radius: var(--radius);
 }
 
 footer {
