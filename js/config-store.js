@@ -31,21 +31,31 @@ export class ConfigStore {
 
     /**
      * Calculates the target path for a file based on the active rules.
-     * @param {Object} fileData { labels: [], originalPath: "", handle: ... }
+     * @param {Object} fileData { labels: [], originalPath: "", handle: ..., date: Date|null }
      * @returns {string|null} The calculated target path or null if no rules match.
      */
     calculatePath(fileData) {
+        const date = fileData.date || new Date(fileData.handle?.lastModified || Date.now());
+        const dateMap = {
+            year: date.getFullYear().toString(),
+            month: (date.getMonth() + 1).toString().padStart(2, '0'),
+            day: date.getDate().toString().padStart(2, '0'),
+            label: fileData.labels[0] || 'unknown'
+        };
+
         for (const rule of this.rules) {
             if (rule.type === 'label') {
                 const label = fileData.labels[0];
-                
+
                 if (!label || label === 'unknown') continue;
 
                 if (new RegExp(rule.pattern, 'i').test(label)) {
-                    return rule.target.replace('{label}', label);
+                    // Expand placeholders: {year}, {month}, {day}, {label}
+                    return rule.target.replace(/{(\w+)}/g, (match, key) => {
+                        return dateMap[key] || match;
+                    });
                 }
             }
-            // Other rule types (date, etc) can be added here
         }
         return null;
     }

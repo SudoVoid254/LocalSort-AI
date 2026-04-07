@@ -63,17 +63,26 @@ class LocalSortApp {
     }
 
     async generatePreview() {
-        // Current Structure
+        // 1. Render the Thumbnail Gallery
+        await this.ui.renderGallery(this.appState.processedFiles, (fileName, newLabel) => {
+            const data = this.appState.processedFiles.get(fileName);
+            if (data) {
+                data.labels = [newLabel];
+                // Re-generate tree immediately to show the impact of the change
+                this.generatePreview();
+            }
+        });
+
+        // 2. Current Structure
         const currentTree = {};
         for (const [name, data] of this.appState.processedFiles.entries()) {
             const lastSlash = data.originalPath.lastIndexOf('/');
             const folderPath = lastSlash === -1 ? '' : data.originalPath.substring(0, lastSlash);
-        
             this.addToTree(currentTree, folderPath, name);
         }
         this.ui.renderTree('current-tree', currentTree);
 
-        // Proposed Structure
+        // 3. Proposed Structure
         const proposedTree = {};
         for (const [name, data] of this.appState.processedFiles.entries()) {
             const targetPath = this.config.calculatePath(data) || 'Unorganized';

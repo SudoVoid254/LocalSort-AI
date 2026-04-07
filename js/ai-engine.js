@@ -39,7 +39,12 @@ export class AIEngine {
         this.worker.postMessage({ type: 'INIT' });
     }
 
-    async labelImage(fileBlob, customLabels = this.defaultLabels) {
+    async labelImage(fileBlob, customLabels = null) {
+        // Use provided custom labels or fall back to defaults
+        const labelsToUse = customLabels && customLabels.length > 0
+            ? customLabels
+            : this.defaultLabels;
+
         return new Promise((resolve, reject) => {
             if (!this.isReady) {
                 reject('AI Engine not ready');
@@ -60,7 +65,7 @@ export class AIEngine {
             this.worker.addEventListener('message', handler);
             this.worker.postMessage({
                 type: 'LABEL',
-                payload: { imageBlob: fileBlob, labels: customLabels }
+                payload: { imageBlob: fileBlob, labels: labelsToUse }
             });
         });
     }

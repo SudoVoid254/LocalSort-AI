@@ -192,4 +192,39 @@ export class UIHandler {
         }
         container.textContent = fullTree;
     }
+
+    async renderGallery(processedFiles, onLabelChange) {
+        const container = document.getElementById('preview-gallery');
+        container.innerHTML = '';
+
+        for (const [fileName, data] of processedFiles.entries()) {
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'display: flex; flex-direction: column; align-items: center; gap: 5px; background: white; padding: 5px; border: 1px solid #ddd; border-radius: 4px;';
+
+            // Thumbnail
+            const img = document.createElement('img');
+            img.style.cssText = 'width: 100px; height: 100px; object-fit: cover; border-radius: 2px; cursor: pointer;';
+
+            // Create preview URL
+            const blob = await data.handle.getFile();
+            img.src = URL.createObjectURL(blob);
+            img.onclick = () => {
+                // Simple zoom-in logic could go here
+                window.open(img.src, '_blank');
+            };
+
+            // Label input
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = data.labels[0] || 'unknown';
+            input.style.cssText = 'width: 90%; font-size: 0.7rem; text-align: center; padding: 2px;';
+            input.onchange = (e) => {
+                onLabelChange(fileName, e.target.value);
+            };
+
+            wrapper.appendChild(img);
+            wrapper.appendChild(input);
+            container.appendChild(wrapper);
+        }
+    }
 }
