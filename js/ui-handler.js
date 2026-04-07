@@ -31,7 +31,18 @@ export class UIHandler {
             }
         });
 
-        // Add rollback trigger if we add a button to the UI
+        document.getElementById('btn-add-rule').addEventListener('click', () => {
+            this.app.handleAddRule();
+        });
+
+        document.getElementById('btn-to-preview').addEventListener('click', () => {
+            this.app.updateState('PREVIEW');
+        });
+
+        document.getElementById('btn-back-to-config').addEventListener('click', () => {
+            this.app.updateState('CONFIG');
+        });
+
         const btnRollback = document.getElementById('btn-rollback');
         if (btnRollback) {
             btnRollback.addEventListener('click', () => this.app.handleRollback());
@@ -65,5 +76,30 @@ export class UIHandler {
     updateStatus(id, text) {
         const el = document.getElementById(id);
         if (el) el.textContent = text;
+    }
+
+    renderRules(rules) {
+        const container = document.getElementById('rules-container');
+        container.innerHTML = '';
+
+        rules.forEach((rule, index) => {
+            const div = document.createElement('div');
+            div.className = 'rule-item';
+            div.innerHTML = `
+                <div class="rule-row">
+                    <span>If label matches <strong>${rule.pattern}</strong> $\to$ move to <strong>${rule.target}</strong></span>
+                    <button class="secondary-btn btn-sm" data-index="${index}">Delete</button>
+                </div>
+            `;
+            container.appendChild(div);
+        });
+
+        container.querySelectorAll('.btn-sm').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const index = e.target.dataset.index;
+                this.app.config.removeRule(index);
+                this.renderRules(this.app.config.rules);
+            });
+        });
     }
 }

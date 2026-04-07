@@ -38,7 +38,13 @@ class LocalSortApp {
         // Initialize AI in background
         this.ai.init(
             (status) => this.ui.updateStatusBar('ai-status', `🧠 AI: ${status}`),
-            () => this.ui.updateStatusBar('ai-status', '🧠 AI: Ready')
+            () => {
+                this.ui.updateStatusBar('ai-status', '🧠 AI: Ready');
+                // Now that AI is ready, we can also render any rules if we're in CONFIG
+                if (this.state === 'CONFIG') {
+                    this.ui.renderRules(this.config.rules);
+                }
+            }
         );
 
         this.updateState('INPUT');
@@ -48,6 +54,10 @@ class LocalSortApp {
         this.state = newState;
         this.ui.updateStepper(newState);
         this.ui.switchView(newState);
+
+        if (newState === 'CONFIG') {
+            this.ui.renderRules(this.config.rules);
+        }
     }
 
     async handleSelectFolder() {
@@ -80,7 +90,6 @@ class LocalSortApp {
             return;
         }
 
-        // Wait for AI Engine to be ready if it isn't already
         if (!this.ai.isReady) {
             this.ui.updateStatus('label-status', 'Waiting for AI model to load...');
             await new Promise((resolve) => {
@@ -98,10 +107,18 @@ class LocalSortApp {
         for (let i = 0; i < files.length; i++) {
             const fileInfo = files[i];
             this.ui.updateProgress('label-progress-bar', ((i + 1) / files.length) * 100);
+
+            // Visual feedback for the user: showing current file and its label as it happens
             this.ui.updateStatus('label-status', `Analyzing ${fileInfo.name}...`);
 
             try {
                 const file = await fileInfo.handle.getFile();
+
+                // CLIP cannot decode video files directly. We should only pass images.
+                if (fileInfo.name.match(/\.(mp4|mov)$/i)) {
+                    throw new Error('Videos are not supported for labeling yet');
+                }
+
                 const result = await this.ai.labelImage(file);
 
                 this.appState.processedFiles.set(fileInfo.name, {
@@ -109,6 +126,7 @@ class LocalSortApp {
                     originalPath: fileInfo.path,
                     handle: fileInfo.handle
                 });
+                this.ui.updateStatus('label-status', `Labeled ${fileInfo.name} as ${result.label}`);
             } catch (err) {
                 console.error(`Failed to label ${fileInfo.name}:`, err);
                 this.appState.processedFiles.set(fileInfo.name, {
@@ -116,11 +134,20 @@ class LocalSortApp {
                     originalPath: fileInfo.path,
                     handle: fileInfo.handle
                 });
+                this.ui.updateStatus('label-status', `Skipped ${fileInfo.name}: ${err.message}`);
             }
+            // Brief pause to make the UI feedback readable
+            await new Promise(r => setTimeout(r, 100));
         }
 
         this.ui.updateStatusBar('ai-status', '🧠 AI: Ready');
         this.updateState('CONFIG');
+    }
+
+    handleAddRule() {
+        const newRule = { id: Date.now().toString(), type: 'label', field: 'primary', pattern: '.*', target: 'Organized/{label}' };
+        this.config.addRule(newRule);
+        this.ui.renderRules(this.config.rules);
     }
 
     async handleApplyChanges() {
