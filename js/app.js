@@ -143,25 +143,26 @@ class LocalSortApp {
         }
 
         this.ui.updateStatusBar('ai-status', '🧠 AI: Analyzing...');
+        this.ui.clearLog();
 
         for (let i = 0; i < files.length; i++) {
             const fileInfo = files[i];
             this.ui.updateProgress('label-progress-bar', ((i + 1) / files.length) * 100);
 
-            // Visual feedback for the user: showing current file and its label as it happens
             this.ui.updateStatus('label-status', `Analyzing ${fileInfo.name}...`);
 
             try {
                 const file = await fileInfo.handle.getFile();
 
-                // CLIP cannot decode video files directly. We should only pass images.
                 if (fileInfo.name.match(/\.(mp4|mov)$/i)) {
                     this.appState.processedFiles.set(fileInfo.name, {
                         labels: ['video'],
                         originalPath: fileInfo.path,
                         handle: fileInfo.handle
                     });
-                    this.ui.updateStatus('label-status', `Skipped ${fileInfo.name}: Video file`);
+                    const msg = `Skipped ${fileInfo.name}: Video file (labeled as video)`;
+                    this.ui.updateStatus('label-status', msg);
+                    this.ui.addLogEntry(msg);
                     continue;
                 }
 
@@ -172,7 +173,9 @@ class LocalSortApp {
                     originalPath: fileInfo.path,
                     handle: fileInfo.handle
                 });
-                this.ui.updateStatus('label-status', `Labeled ${fileInfo.name} as ${result.label}`);
+                const msg = `Labeled ${fileInfo.name} as ${result.label}`;
+                this.ui.updateStatus('label-status', msg);
+                this.ui.addLogEntry(msg);
             } catch (err) {
                 console.error(`Failed to label ${fileInfo.name}:`, err);
                 this.appState.processedFiles.set(fileInfo.name, {
@@ -180,9 +183,10 @@ class LocalSortApp {
                     originalPath: fileInfo.path,
                     handle: fileInfo.handle
                 });
-                this.ui.updateStatus('label-status', `Error labeling ${fileInfo.name}`);
+                const msg = `Error labeling ${fileInfo.name}: ${err.message}`;
+                this.ui.updateStatus('label-status', msg);
+                this.ui.addLogEntry(msg);
             }
-            // Brief pause to make the UI feedback readable
             await new Promise(r => setTimeout(r, 100));
         }
 
@@ -213,11 +217,12 @@ class LocalSortApp {
         }
 
         this.ui.updateStatus('execution-status', 'Organization complete!');
-        setTimeout(() => {
-            this.appState.transactionLog = [];
-            this.appState.processedFiles.clear();
-            this.updateState('INPUT');
-        }, 3000);
+    }
+
+    handleFinishExecution() {
+        this.appState.transactionLog = [];
+        this.appState.processedFiles.clear();
+        this.updateState('INPUT');
     }
 
     async handleRollback() {

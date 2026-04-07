@@ -91,6 +91,20 @@ export class UIHandler {
         if (el) el.textContent = text;
     }
 
+    addLogEntry(text) {
+        const log = document.getElementById('label-log');
+        if (!log) return;
+        const entry = document.createElement('div');
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${text}`;
+        log.appendChild(entry);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    clearLog() {
+        const log = document.getElementById('label-log');
+        if (log) log.innerHTML = '';
+    }
+
     renderRules(rules) {
         const container = document.getElementById('rules-container');
         container.innerHTML = '';
