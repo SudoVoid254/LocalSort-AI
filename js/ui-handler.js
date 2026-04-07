@@ -11,6 +11,16 @@ export class UIHandler {
     init() {
         this.cacheElements();
         this.bindEvents();
+        this.loadHelp();
+    }
+
+    loadHelp() {
+        fetch('js/config-help.html')
+            .then(r => r.text())
+            .then(text => {
+                document.getElementById('config-help').innerHTML = text;
+            })
+            .catch(e => console.error('Help failed to load', e));
     }
 
     cacheElements() {
@@ -46,6 +56,11 @@ export class UIHandler {
         const btnRollback = document.getElementById('btn-rollback');
         if (btnRollback) {
             btnRollback.addEventListener('click', () => this.app.handleRollback());
+        }
+
+        const btnFinish = document.getElementById('btn-finish-execution');
+        if (btnFinish) {
+            btnFinish.addEventListener('click', () => this.app.handleFinishExecution());
         }
     }
 

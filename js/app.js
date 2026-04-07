@@ -90,7 +90,7 @@ class LocalSortApp {
             const part = parts[i];
             if (!part) continue;
             if (i === parts.length - 1) {
-                // It's the leaf directory or the file's target folder
+                // Leaf directory
                 if (!current[part]) current[part] = { type: 'directory', children: {} };
                 current[part].children[fileName] = { type: 'file' };
             } else {
