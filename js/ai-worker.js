@@ -29,16 +29,15 @@ self.onmessage = async (e) => {
             return;
         }
 
+        let imageUrl = null;
+
         try {
             const { imageBlob, labels } = payload;
-            // Convert Blob to URL for the pipeline
-            const imageUrl = URL.createObjectURL(imageBlob);
+            imageUrl = URL.createObjectURL(imageBlob);
 
             const result = await classifier(imageUrl, labels);
-            URL.revokeObjectURL(imageUrl);
-
-            // Return the top label with confidence > threshold
             const top = result[0];
+
             self.postMessage({
                 type: 'RESULT',
                 payload: {
@@ -48,6 +47,10 @@ self.onmessage = async (e) => {
             });
         } catch (err) {
             self.postMessage({ type: 'ERROR', payload: err.message });
+        } finally {
+            if (imageUrl) {
+                URL.revokeObjectURL(imageUrl);
+            }
         }
     }
 };

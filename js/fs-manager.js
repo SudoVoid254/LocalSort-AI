@@ -46,7 +46,7 @@ export class FSManager {
 
         await sourceHandle.remove({ recursive: false });
 
-        return { sourcePath, targetPath: `${targetPath}/${fileName}` };
+        return { sourcePath, targetPath: targetPath.endsWith('/') ? `${targetPath}${fileName}` : `${targetPath}/${fileName}` };
     }
 
     async ensureDirectoryPath(rootHandle, path) {
@@ -73,13 +73,18 @@ export class FSManager {
     }
 
     async rollback(transactionLog) {
-        // Iterate backwards through the log and reverse moves
         for (let i = transactionLog.length - 1; i >= 0; i--) {
             const entry = transactionLog[i];
+            
+            const targetHandle = await this.getFileHandleByPath(this.rootHandle, entry.targetPath);
+            
+            const lastSlash = entry.sourcePath.lastIndexOf('/');
+            const originalFolderPath = lastSlash === -1 ? '' : entry.sourcePath.substring(0, lastSlash);
+
             await this.moveFile(
-                await this.getFileHandleByPath(this.rootHandle, entry.targetPath),
+                targetHandle,
                 entry.targetPath,
-                entry.sourcePath.substring(0, entry.sourcePath.lastIndexOf('/'))
+                originalFolderPath
             );
         }
     }

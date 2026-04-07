@@ -38,7 +38,10 @@ export class ConfigStore {
         for (const rule of this.rules) {
             if (rule.type === 'label') {
                 const label = fileData.labels[0];
-                if (label && new RegExp(rule.pattern, 'i').test(label)) {
+                
+                if (!label || label === 'unknown') continue;
+
+                if (new RegExp(rule.pattern, 'i').test(label)) {
                     return rule.target.replace('{label}', label);
                 }
             }

@@ -135,7 +135,7 @@ export class UIHandler {
                         <option value="video" ${rule.pattern === 'video' ? 'selected' : ''}>Videos</option>
                         <option value="unknown" ${rule.pattern === 'unknown' ? 'selected' : ''}>Unknown</option>
                     </select>
-                    <span style="font-size: 0.9rem"> $\to$ move to </span>
+                    <span style="font-size: 0.9rem"> &#10142; move to </span>
                     <input type="text" class="rule-input" value="${rule.target}" data-index="${index}" data-field="target" style="width: 150px; padding: 4px;">
                     <button class="secondary-btn btn-sm" data-index="${index}" style="margin-left: 10px; padding: 5px 10px;">Delete</button>
                 </div>

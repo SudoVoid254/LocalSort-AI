@@ -84,20 +84,19 @@ class LocalSortApp {
     }
 
     addToTree(tree, path, fileName) {
-        const parts = path.split('/');
+        const parts = path.split('/').filter(p => p);
         let current = tree;
-        for (let i = 0; i < parts.length; i++) {
-            const part = parts[i];
-            if (!part) continue;
-            if (i === parts.length - 1) {
-                // Leaf directory
-                if (!current[part]) current[part] = { type: 'directory', children: {} };
-                current[part].children[fileName] = { type: 'file' };
-            } else {
-                if (!current[part]) current[part] = { type: 'directory', children: {} };
-                current = current[part].children;
+
+        // 1. Traverse/Create all directory parts
+        for (const part of parts) {
+            if (!current[part]) {
+                current[part] = { type: 'directory', children: {} };
             }
+            current = current[part].children;
         }
+
+        // 2. Add the file directly to the last folder reached
+        current[fileName] = { type: 'file' };
     }
 
     async handleSelectFolder() {
@@ -187,7 +186,7 @@ class LocalSortApp {
                 this.ui.updateStatus('label-status', msg);
                 this.ui.addLogEntry(msg);
             }
-            await new Promise(r => setTimeout(r, 100));
+            await new Promise(requestAnimationFrame);
         }
 
         this.ui.updateStatusBar('ai-status', '🧠 AI: Ready');
@@ -209,11 +208,10 @@ class LocalSortApp {
             this.ui.updateProgress('execution-progress-bar', ((i + 1) / files.length) * 100);
             this.ui.updateStatus('execution-status', `Moving ${name}...`);
 
-            const targetPath = this.config.calculatePath(data);
-            if (targetPath) {
-                const moveResult = await this.fs.moveFile(data.handle, data.originalPath, targetPath);
-                this.appState.transactionLog.push(moveResult);
-            }
+            const targetPath = this.config.calculatePath(data) || 'Unorganized';
+
+            const moveResult = await this.fs.moveFile(data.handle, data.originalPath, targetPath);
+            this.appState.transactionLog.push(moveResult);
         }
 
         this.ui.updateStatus('execution-status', 'Organization complete!');
@@ -232,19 +230,19 @@ class LocalSortApp {
         }
 
         this.updateState('EXECUTION');
-        const log = this.appState.transactionLog;
-
-        for (let i = 0; i < log.length; i++) {
-            const entry = log[i];
-            this.ui.updateProgress('execution-progress-bar', ((i + 1) / log.length) * 100);
-            this.ui.updateStatus('execution-status', `Restoring ${entry.targetPath}...`);
-
-            await this.fs.rollback([entry]);
+        
+        try {
+            this.ui.updateStatus('execution-status', `Reversing ${this.appState.transactionLog.length} changes...`);
+            await this.fs.rollback(this.appState.transactionLog);
+            
+            this.ui.updateStatus('execution-status', 'Rollback complete!');
+            this.appState.transactionLog = [];
+        } catch (err) {
+            this.ui.updateStatus('execution-status', `Rollback failed: ${err.message}`);
+            console.error(err);
         }
 
-        this.ui.updateStatus('execution-status', 'Rollback complete!');
-        this.appState.transactionLog = [];
-        setTimeout(() => this.updateState('INPUT'), 3000);
+        setTimeout(() => this.updateState('PREVIEW'), 2000);
     }
 }
 
