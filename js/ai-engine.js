@@ -6,7 +6,7 @@ export class AIEngine {
     constructor() {
         this.worker = null;
         this.isReady = false;
-        this.defaultLabels = ['people', 'landscape', 'indoor', 'outdoor', 'urban', 'rural', 'nature', 'document'];
+        this.defaultLabels = ['nature', 'urban', 'document', 'people', 'indoor', 'food', 'animal', 'landscape', 'screenshot', 'night'];
     }
 
     async init(onStatus, onReady) {

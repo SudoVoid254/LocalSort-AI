@@ -49,7 +49,13 @@ export class ConfigStore {
 
                 if (!label || label === 'unknown') continue;
 
-                if (new RegExp(rule.pattern, 'i').test(label)) {
+                const isNegation = rule.pattern.startsWith('!');
+                const actualPattern = isNegation ? rule.pattern.substring(1) : rule.pattern;
+
+                const matches = new RegExp(actualPattern, 'i').test(label);
+                const shouldApply = isNegation ? !matches : matches;
+
+                if (shouldApply) {
                     // Expand placeholders: {year}, {month}, {day}, {label}
                     return rule.target.replace(/{(\w+)}/g, (match, key) => {
                         return dateMap[key] || match;
