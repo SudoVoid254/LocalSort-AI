@@ -66,19 +66,18 @@ class LocalSortApp {
         // Current Structure
         const currentTree = {};
         for (const [name, data] of this.appState.processedFiles.entries()) {
-            this.addToTree(currentTree, data.originalPath, name);
+            const lastSlash = data.originalPath.lastIndexOf('/');
+            const folderPath = lastSlash === -1 ? '' : data.originalPath.substring(0, lastSlash);
+        
+            this.addToTree(currentTree, folderPath, name);
         }
         this.ui.renderTree('current-tree', currentTree);
 
         // Proposed Structure
         const proposedTree = {};
         for (const [name, data] of this.appState.processedFiles.entries()) {
-            const targetPath = this.config.calculatePath(data);
-            if (targetPath) {
-                this.addToTree(proposedTree, targetPath, name);
-            } else {
-                this.addToTree(proposedTree, 'Unorganized', name);
-            }
+            const targetPath = this.config.calculatePath(data) || 'Unorganized';
+            this.addToTree(proposedTree, targetPath, name);
         }
         this.ui.renderTree('proposed-tree', proposedTree);
     }

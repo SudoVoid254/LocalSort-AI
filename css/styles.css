@@ -172,8 +172,7 @@ h1 {
     overflow-y: auto;
     font-family: monospace;
     white-space: pre;
-    background: #212529;
-    color: #00ff00;
+    line-height: 1.5;
     padding: 10px;
     border-radius: var(--radius);
 }
