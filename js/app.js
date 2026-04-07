@@ -29,6 +29,12 @@ class LocalSortApp {
     async init() {
         this.ui.init();
 
+        // Check for File System Access API support
+        if (!('showDirectoryPicker' in window)) {
+            this.ui.updateStatusBar('fs-status', '❌ Browser not supported');
+            alert('Your browser does not support the File System Access API. Please use a Chromium-based browser (Chrome, Edge, Brave) and ensure you are in a secure context (HTTPS). If using Brave, check your Shield settings.');
+        }
+
         // Initialize AI in background
         this.ai.init(
             (status) => this.ui.updateStatusBar('ai-status', `🧠 AI: ${status}`),
