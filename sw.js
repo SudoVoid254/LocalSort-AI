@@ -9,7 +9,8 @@ const ASSETS = [
   './js/ai-worker.js',
   './js/config-store.js',
   './js/config-help.html',
-  './css/styles.css'
+  './css/styles.css',
+  './manifest.json'
 ];
 
 // Install: Cache core logic

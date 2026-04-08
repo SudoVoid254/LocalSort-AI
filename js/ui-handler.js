@@ -223,7 +223,7 @@ export class UIHandler {
                 const file = await data.handle.getFile();
                 img.src = URL.createObjectURL(file);
             } catch (e) {
-                img.src = 'https://via.placeholder.com/100?text=No+Preview';
+                img.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23f3f4f6'/><text x='50%25' y='50%25' font-family='sans-serif' font-size='12' fill='%239ca3af' text-anchor='middle' dy='.3em'>No Preview</text></svg>`;
             }
 
             const input = document.createElement('input');
