@@ -27,10 +27,12 @@ export class FSManager {
             if (view.getUint16(0) !== 0xFFD8) return null; // Not a JPEG
 
             let offset = 2;
-            while (offset < view.byteLength - 2) {
-                if (view.getUint16(offset) === 0xFFE1) {
+            while (offset + 4 < view.byteLength) {
+                const marker = view.getUint16(offset);
+                if (marker === 0xFFE1) {
                     // APP1 marker (EXIF)
                     const segmentLength = view.getUint16(offset + 2);
+                    if (offset + segmentLength + 2 > view.byteLength) break;
                     if (view.getUint32(offset + 4, false) === 0x45584946) { // "Exif"
                         const tiffOffset = offset + 10;
                         const isLittleEndian = view.getUint16(tiffOffset) === 0x4949;
@@ -42,6 +44,7 @@ export class FSManager {
 
                         for (let i = 0; i < numEntries; i++) {
                             const entryOffset = ifdStart + 2 + (i * 12);
+                            if (entryOffset + 12 > view.byteLength) break;
                             const tag = view.getUint16(entryOffset, isLittleEndian);
                             if (tag === 0x9003) { // DateTimeOriginal
                                 const valueOffset = view.getUint32(entryOffset + 8, isLittleEndian);
@@ -89,51 +92,29 @@ export class FSManager {
     }
 
     async moveFile(sourceHandle, sourcePath, targetPath) {
-        // Implementation: Copy -> Delete
-        // 1. Create target directory structure
+        if (!targetPath || targetPath.trim() === "" || targetPath === sourcePath) {
+            return { sourcePath, targetPath: sourcePath, status: 'skipped' };
+        }
         const targetDir = await this.ensureDirectoryPath(this.rootHandle, targetPath);
 
-        // 2. Get source file content
         const sourceFile = await sourceHandle.getFile();
         const content = await sourceFile.arrayBuffer();
 
-        // 3. Collision Detection & Filename Generation
-        const originalName = sourceHandle.name;
-        let fileName = originalName;
-        let counter = 1;
-
-        while (true) {
-            try {
-                await targetDir.getFileHandle(fileName);
-                // File exists, generate new name: "name (1).ext"
-                const lastDot = originalName.lastIndexOf('.');
-                const nameWithoutExt = lastDot === -1 ? originalName : originalName.substring(0, lastDot);
-                const ext = lastDot === -1 ? '' : originalName.substring(lastDot);
-                fileName = `${nameWithoutExt} (${counter})${ext}`;
-                counter++;
-            } catch (e) {
-                // File does not exist, we can use this name
-                break;
-            }
-        }
-
-        // 4. Write file content to target
+        const fileName = sourceHandle.name;
+        
         const newFileHandle = await targetDir.getFileHandle(fileName, { create: true });
         const writable = await newFileHandle.createWritable();
         await writable.write(content);
         await writable.close();
 
-        // 5. Remove source file
-        try {
+        const normalizedSource = sourcePath.replace(/\\/g, '/');
+        const destinationPath = targetPath ? `${targetPath}/${fileName}` : fileName;
+        
+        if (normalizedSource !== destinationPath) {
             await sourceHandle.remove({ recursive: false });
-        } catch (e) {
-            // Fallback for older browsers
-            const parentPath = sourcePath.substring(0, sourcePath.lastIndexOf('/'));
-            const parentHandle = await this.getDirectoryHandleByPath(this.rootHandle, parentPath);
-            await parentHandle.remove(originalName);
         }
 
-        return { sourcePath, targetPath: targetPath.endsWith('/') ? `${targetPath}${fileName}` : `${targetPath}/${fileName}` };
+        return { sourcePath, targetPath: destinationPath };
     }
 
     async ensureDirectoryPath(rootHandle, path) {
@@ -162,17 +143,15 @@ export class FSManager {
     async rollback(transactionLog) {
         for (let i = transactionLog.length - 1; i >= 0; i--) {
             const entry = transactionLog[i];
+            try {
+                const targetHandle = await this.getFileHandleByPath(this.rootHandle, entry.targetPath);
+                const lastSlash = entry.sourcePath.lastIndexOf('/');
+                const originalFolderPath = lastSlash === -1 ? '' : entry.sourcePath.substring(0, lastSlash);
 
-            const targetHandle = await this.getFileHandleByPath(this.rootHandle, entry.targetPath);
-
-            const lastSlash = entry.sourcePath.lastIndexOf('/');
-            const originalFolderPath = lastSlash === -1 ? '' : entry.sourcePath.substring(0, lastSlash);
-
-            await this.moveFile(
-                targetHandle,
-                entry.targetPath,
-                originalFolderPath
-            );
+                await this.moveFile(targetHandle, entry.targetPath, originalFolderPath);
+            } catch (err) {
+                console.error(`Failed to rollback ${entry.targetPath}:`, err);
+            }
         }
     }
 

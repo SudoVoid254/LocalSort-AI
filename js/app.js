@@ -27,6 +27,13 @@ class LocalSortApp {
     }
 
     async init() {
+
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js')
+                .then(() => console.log('PWA Service Worker Registered'))
+                .catch(err => console.error('PWA Setup Failed', err));
+        }
+
         this.ui.init();
 
         // Check for File System Access API support

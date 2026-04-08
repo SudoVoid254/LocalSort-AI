@@ -73,39 +73,41 @@ export class AIEngine {
     async extractVideoFrame(videoBlob) {
         return new Promise((resolve, reject) => {
             const video = document.createElement('video');
-            video.muted = true;
-            video.playsInline = true;
-
             const url = URL.createObjectURL(videoBlob);
-            video.src = url;
+            
+            const timeout = setTimeout(() => {
+                cleanup();
+                reject(new Error('Video processing timed out'));
+            }, 5000);
 
-            video.onloadeddata = async () => {
-                // Seek to 10% of duration to avoid black frames at the start
-                video.currentTime = video.duration * 0.1;
+            const cleanup = () => {
+                clearTimeout(timeout);
+                URL.revokeObjectURL(url);
+                video.src = "";
+                video.load();
             };
 
+            video.muted = true;
+            video.src = url;
+            video.onloadeddata = () => video.currentTime = video.duration * 0.1;
             video.onseeked = async () => {
                 try {
                     const canvas = document.createElement('canvas');
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0);
-
+                    canvas.getContext('2d').drawImage(video, 0, 0);
                     const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
-                    URL.revokeObjectURL(url);
+                    cleanup();
                     resolve(blob);
                 } catch (err) {
-                    URL.revokeObjectURL(url);
+                    cleanup();
                     reject(err);
                 }
             };
-
-            video.onerror = (err) => {
-                URL.revokeObjectURL(url);
+            video.onerror = () => {
+                cleanup();
                 reject(new Error('Video loading failed'));
             };
         });
     }
 }
-

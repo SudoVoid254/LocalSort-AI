@@ -46,7 +46,12 @@ export class UIHandler {
         });
 
         document.getElementById('btn-to-preview').addEventListener('click', () => {
-            this.app.updateState('PREVIEW');
+            if (this.validateRules()) {
+                this.app.generatePreview();
+                this.app.updateState('PREVIEW');
+            } else {
+                alert("Configuration Error: Please specify a 'Move to' path for all rules. Blank paths can cause file loss.");
+            }
         });
 
         document.getElementById('btn-back-to-config').addEventListener('click', () => {
@@ -238,5 +243,22 @@ export class UIHandler {
             wrapper.appendChild(input);
             container.appendChild(wrapper);
         }
+    }
+
+    validateRules() {
+        const inputs = document.querySelectorAll('.rule-row input[data-field="target"]');
+        let allValid = true;
+
+        inputs.forEach(input => {
+            const value = input.value.trim();
+            if (!value) {
+                input.style.border = "2px solid var(--danger)";
+                allValid = false;
+            } else {
+                input.style.border = "1px solid var(--border-color)";
+            }
+        });
+
+        return allValid;
     }
 }

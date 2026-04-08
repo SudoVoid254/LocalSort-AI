@@ -45,9 +45,7 @@ export class ConfigStore {
 
         for (const rule of this.rules) {
             if (rule.type === 'label') {
-                const label = fileData.labels[0];
-
-                if (!label || label === 'unknown') continue;
+                const label = fileData.labels[0] || 'unknown';
 
                 const isNegation = rule.pattern.startsWith('!');
                 const actualPattern = isNegation ? rule.pattern.substring(1) : rule.pattern;
