@@ -31,27 +31,35 @@ body {
 }
 
 header {
-    text-align: center;
-    margin-bottom: 30px;
-
-    /* Position the header in the title bar area */
-    height: 40px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 60px;
+    
     display: flex;
     align-items: center;
+    justify-content: space-between;
 
-    /* Critical: This prevents content from going under the window controls */
-    padding-left: env(titlebar-area-x, 0);
-    padding-top: env(titlebar-area-y, 0);
-    width: env(titlebar-area-width, 100%);
+    padding-left: calc(env(titlebar-area-x, 0px) + 20px);
+    padding-right: calc(100% - env(titlebar-area-width, 100%) - env(titlebar-area-x, 0px) + 20px);
+    padding-top: env(titlebar-area-y, 0px);
 
-    /* Allows the user to click and drag the window using the header */
-    app-region: drag; 
     -webkit-app-region: drag;
+    app-region: drag;
+    
+    border-bottom: 1px solid #eee;
 }
 
-header nav, header button {
-  app-region: no-drag;
-  -webkit-app-region: no-drag;
+header h1 {
+    font-size: 1.2rem;
+    margin: 0;
+    white-space: nowrap;
+}
+
+header nav, 
+header button,
+#stepper .step {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
 }
 
 h1 {
