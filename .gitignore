@@ -1,0 +1,20 @@
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Editor/IDE folders
+.vscode/
+.idea/
+
+# Local server / environment
+node_modules/
+.env
+
+# AI Model Cache (if you start using a local node setup)
+/models/
+
+# Transaction logs or local temporary data
+*.log
+
+#Claude code
+.claude

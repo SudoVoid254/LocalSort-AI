@@ -2,6 +2,12 @@
   "short_name": "LocalSort AI",
   "name": "LocalSort-AI: Privacy-First Media Organizer",
   "description": "On-device AI photo and video organization using Transformers.js.",
+  "protocol_handlers": [
+    {
+      "protocol": "web+localsort",
+      "url": "/index.html?query=%s"
+    }
+  ],
   "screenshots": [
     {
       "src": "screenshots/desktop.png",
@@ -33,6 +39,7 @@
   "start_url": "index.html",
   "background_color": "#ffffff",
   "display": "standalone",
+  "display_override": ["window-controls-overlay"],
   "scope": "./",
   "theme_color": "#2563eb"
 }

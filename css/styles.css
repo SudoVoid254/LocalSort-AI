@@ -33,6 +33,25 @@ body {
 header {
     text-align: center;
     margin-bottom: 30px;
+
+    /* Position the header in the title bar area */
+    height: 40px;
+    display: flex;
+    align-items: center;
+
+    /* Critical: This prevents content from going under the window controls */
+    padding-left: env(titlebar-area-x, 0);
+    padding-top: env(titlebar-area-y, 0);
+    width: env(titlebar-area-width, 100%);
+
+    /* Allows the user to click and drag the window using the header */
+    app-region: drag; 
+    -webkit-app-region: drag;
+}
+
+header nav, header button {
+  app-region: no-drag;
+  -webkit-app-region: no-drag;
 }
 
 h1 {
