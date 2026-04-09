@@ -41,7 +41,7 @@
 
 * **Core Logic:** Vanilla JavaScript (ES6 Modules)
 * **AI Engine:** [Transformers.js](https://github.com/xenova/transformers.js) (CLIP-ViT-B-32)
-* **File Handling:** [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API)
+* **File Handling:** [File System Access API](https://github.com/WICG/file-system-access)
 * **Threading:** Web Workers to keep the UI responsive during heavy inference.
 
 ---
