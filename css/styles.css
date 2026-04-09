@@ -78,10 +78,11 @@ header {
     padding-right: 20px;
     padding-top: env(titlebar-area-y, 0px);
 
-    border-bottom: 1px solid var(--border-color);
-    background: rgba(9, 9, 11, 0.7);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: rgba(18, 18, 20, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
 
     -webkit-app-region: drag;
     app-region: drag;
@@ -290,11 +291,12 @@ footer {
         height: auto;
         gap: 15px;
         margin-bottom: 24px;
-        padding: env(titlebar-area-y, 0px) 0 16px 0;
+        padding: env(titlebar-area-y, 0px) 12px 16px 12px;
         text-align: center;
-        border-bottom: none;
-        background: transparent;
-        backdrop-filter: none;
+        border: 1px solid var(--border-color);
+        background: rgba(18, 18, 20, 0.9);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
     }
 
     header h1 {
