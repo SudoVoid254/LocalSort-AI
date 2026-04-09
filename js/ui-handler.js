@@ -122,15 +122,10 @@ export class UIHandler {
         rules.forEach((rule, index) => {
             const div = document.createElement('div');
             div.className = 'rule-item';
-            div.style.marginBottom = '15px';
             div.style.display = 'flex';
             div.style.alignItems = 'center';
             div.style.gap = '10px';
             div.style.justifyContent = 'center';
-            div.style.background = '#fcfcfc';
-            div.style.padding = '10px';
-            div.style.border = '1px solid #eee';
-            div.style.borderRadius = '4px';
 
             div.innerHTML = `
                 <div class="rule-row">
@@ -206,15 +201,15 @@ export class UIHandler {
 
         for (const [fileName, data] of processedFiles.entries()) {
             const wrapper = document.createElement('div');
+            wrapper.className = 'gallery-item-wrapper';
             wrapper.style.textAlign = 'center';
             wrapper.style.fontSize = '0.8rem';
 
             const img = document.createElement('img');
+            img.className = 'gallery-item';
             img.style.width = '100px';
             img.style.height = '100px';
             img.style.objectFit = 'cover';
-            img.style.borderRadius = '4px';
-            img.style.border = '1px solid #ddd';
             img.style.cursor = 'pointer';
 
             // In a real FS Access API app, we'd create a URL from the handle
@@ -223,16 +218,21 @@ export class UIHandler {
                 const file = await data.handle.getFile();
                 img.src = URL.createObjectURL(file);
             } catch (e) {
-                img.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23f3f4f6'/><text x='50%25' y='50%25' font-family='sans-serif' font-size='12' fill='%239ca3af' text-anchor='middle' dy='.3em'>No Preview</text></svg>`;
+                img.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2318181b'/><text x='50%25' y='50%25' font-family='sans-serif' font-size='12' fill='%23a1a1aa' text-anchor='middle' dy='.3em'>No Preview</text></svg>`;
             }
 
             const input = document.createElement('input');
             input.type = 'text';
+            input.className = 'gallery-input';
             input.value = data.labels[0] || '';
             input.style.width = '90px';
             input.style.fontSize = '0.7rem';
             input.style.marginTop = '5px';
             input.style.textAlign = 'center';
+            input.style.background = 'var(--bg-color)';
+            input.style.color = 'var(--text-main)';
+            input.style.border = '1px solid var(--border-color)';
+            input.style.borderRadius = '4px';
 
             input.addEventListener('change', (e) => {
                 onLabelChange(fileName, e.target.value);
