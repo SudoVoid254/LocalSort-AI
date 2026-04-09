@@ -210,6 +210,45 @@ footer {
     padding-top: 20px;
 }
 
+@media (max-width: 600px) {
+    #app {
+        padding: 12px;
+    }
+
+    header {
+        flex-direction: column;
+        align-items: flex-start;
+        height: auto;
+        gap: 10px;
+        margin-bottom: 16px;
+        padding: env(titlebar-area-y, 0px) 0 8px 0;
+    }
+
+    #stepper {
+        flex: unset;
+        width: 100%;
+        justify-content: space-between;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        scrollbar-width: none;
+        margin-bottom: 0;
+    }
+
+    #stepper::-webkit-scrollbar {
+        display: none;
+    }
+
+    .step {
+        flex-shrink: 0;
+        font-size: 0.75rem;
+        padding: 8px 10px;
+    }
+
+    .preview-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 #status-bar {
     display: flex;
     justify-content: space-between;
