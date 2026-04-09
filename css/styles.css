@@ -35,15 +35,13 @@ body {
 header {
     box-sizing: border-box;
     width: 100%;
-    height: auto;
     min-height: 60px;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
     
     display: flex;
     align-items: center;
     justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
+    gap: 20px;
 
     padding: env(titlebar-area-y, 0px) 20px 10px calc(env(titlebar-area-x, 0px) + 20px);
 
@@ -54,6 +52,7 @@ header {
 header h1 {
     margin: 0;
     font-size: 1.5rem;
+    font-weight: 800;
     white-space: nowrap;
 }
 
@@ -64,16 +63,17 @@ header button {
 }
 
 h1 {
-    margin-bottom: 20px;
+    margin: 0 0 20px 0;
     font-weight: 800;
     color: var(--text-main);
 }
 
 #stepper {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 10px;
-    margin-bottom: 20px;
+    margin-bottom: 0;
+    flex: 1;
 }
 
 .step {
