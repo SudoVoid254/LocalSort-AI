@@ -1,19 +1,49 @@
+/* Apply dark theme to scrollbars */
+html {
+    color-scheme: dark;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-color);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
 :root {
-    --bg-color: #f8f9fa;
-    --card-bg: #ffffff;
-    --text-main: #212529;
-    --text-muted: #6c757d;
-    --primary: #0d6efd;
-    --primary-hover: #0b5ed7;
-    --danger: #dc3545;
-    --danger-hover: #bb2130;
-    --border-color: #dee2e6;
-    --radius: 8px;
-    --shadow: 0 4px 6px rgba(0,0,0,0.1);
+    /* Backgrounds */
+    --bg-color: #09090b;      /* Zinc-950 */
+    --card-bg: #121214;      /* Slightly lighter Zinc */
+    --card-hover: #18181b; 
+    
+    /* Text */
+    --text-main: #fafafa;    /* Zinc-50 */
+    --text-muted: #a1a1aa;   /* Zinc-400 */
+    
+    /* Brand / Action */
+    --primary: #3b82f6;      /* Blue-500 */
+    --primary-hover: #60a5fa;
+    --danger: #ef4444;       
+    --danger-hover: #f87171;
+    
+    /* UI Details */
+    --border-color: #27272a; /* Zinc-800 */
+    --radius: 12px;          
+    --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: 'Inter', -apple-system, sans-serif;
     background-color: var(--bg-color);
     color: var(--text-main);
     margin: 0;
@@ -21,6 +51,8 @@ body {
     justify-content: center;
     align-items: flex-start;
     min-height: 100vh;
+    /* Subtle glow effect in the corner */
+    background-image: radial-gradient(circle at top center, #1e1b4b 0%, transparent 600px);
 }
 
 #app {
@@ -35,25 +67,43 @@ body {
 header {
     box-sizing: border-box;
     width: 100%;
-    min-height: 60px;
-    margin-bottom: 20px;
-    
+    height: 70px;
+    margin-bottom: 40px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 20px;
+    
+    /* PWA Titlebar Support */
+    padding-left: calc(env(titlebar-area-x, 0px) + 20px);
+    padding-right: 20px;
+    padding-top: env(titlebar-area-y, 0px);
+    
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(9, 9, 11, 0.7);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
 
-    padding: env(titlebar-area-y, 0px) 20px 10px calc(env(titlebar-area-x, 0px) + 20px);
-
-    app-region: drag;
     -webkit-app-region: drag;
+    app-region: drag;
 }
 
 header h1 {
+    font-size: 1.25rem;
+    font-weight: 700;
     margin: 0;
-    font-size: 1.5rem;
-    font-weight: 800;
     white-space: nowrap;
+    
+    /* The Gradient */
+    background: linear-gradient(to right, #ffffff, #a1a1aa);
+    
+    /* Standard Property */
+    background-clip: text;
+    /* Vendor Prefix for older Chrome/Safari/Edge */
+    -webkit-background-clip: text;
+    
+    /* Makes the text transparent so the background gradient shows through */
+    -webkit-text-fill-color: transparent;
+    color: transparent; /* Fallback for standard browsers */
 }
 
 header nav, 
@@ -70,33 +120,37 @@ h1 {
 
 #stepper {
     display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-bottom: 0;
-    flex: 1;
+    gap: 8px;
+    align-items: center;
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
 }
 
 .step {
-    flex: 1;
-    padding: 10px;
-    text-align: center;
-    background: var(--border-color);
-    border-radius: var(--radius);
-    font-size: 0.9rem;
+    padding: 6px 14px;
+    border-radius: 99px;
+    font-size: 0.8rem;
+    font-weight: 500;
     color: var(--text-muted);
-    transition: all 0.3s ease;
-    border: 2px solid transparent;
+    border: 1px solid transparent;
+    transition: all 0.2s;
 }
 
 .step.active {
-    background: var(--primary);
-    color: white;
-    font-weight: bold;
-    border-color: var(--primary);
+    background: rgba(59, 130, 246, 0.1); /* 10% opacity Blue */
+    color: var(--primary);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.15); /* Soft glow */
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .view {
     display: none;
+    animation: fadeIn 0.3s ease-out;
 }
 
 .view.active {
@@ -105,8 +159,9 @@ h1 {
 
 .card {
     background: var(--card-bg);
-    padding: 30px;
+    border: 1px solid var(--border-color);
     border-radius: var(--radius);
+    padding: 32px;
     box-shadow: var(--shadow);
     text-align: center;
 }
@@ -118,6 +173,17 @@ h1 {
 .card p {
     color: var(--text-muted);
     margin-bottom: 20px;
+}
+
+button {
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    transition: all 0.2s;
 }
 
 .primary-btn, .secondary-btn {
@@ -132,19 +198,22 @@ h1 {
 .primary-btn {
     background: var(--primary);
     color: white;
+    box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
 }
 
 .primary-btn:hover {
     background: var(--primary-hover);
+    transform: translateY(-1px);
 }
 
 .secondary-btn {
-    background: var(--border-color);
+    background: #27272a;
     color: var(--text-main);
+    border: 1px solid var(--border-color);
 }
 
 .secondary-btn:hover {
-    background: #ced4da;
+    background: #3f3f46;
 }
 
 .primary-btn.danger {

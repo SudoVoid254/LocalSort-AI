@@ -1,3 +1,10 @@
+# ⚠️ Warning
+* **Still under construction. 🚧**
+* **Not fully checked for side-effects.**
+* **Regular updates that might break the site.**
+
+---
+
 # 📁 LocalSort-AI 
 
 **LocalSort-AI** is a privacy-first, browser-based media organizer that uses on-device Artificial Intelligence to categorize your photos and videos. No cloud, no uploads, no subscription—just smart sorting directly on your hardware.
