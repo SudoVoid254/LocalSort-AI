@@ -124,6 +124,7 @@ h1 {
     padding: 4px;
     border-radius: 99px;
     border: 1px solid var(--border-color);
+    white-space: nowrap;
 }
 
 .step {
@@ -305,17 +306,18 @@ footer {
     }
 
     #stepper {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         justify-content: center;
         width: auto;
         max-width: 100%;
-        overflow-x: visible;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .step {
         flex-shrink: 0;
-        font-size: 0.7rem;
-        padding: 6px 10px;
+        font-size: 0.65rem;
+        padding: 6px 8px;
     }
 
     .preview-grid {
