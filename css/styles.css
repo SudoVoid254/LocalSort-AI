@@ -291,8 +291,9 @@ footer {
         height: auto;
         gap: 15px;
         margin-bottom: 24px;
-        padding: env(titlebar-area-y, 0px) 12px 16px 12px;
+        padding: 16px 12px;
         text-align: center;
+        justify-content: center;
         border: 1px solid var(--border-color);
         background: rgba(18, 18, 20, 0.9);
         backdrop-filter: blur(12px);
@@ -300,7 +301,7 @@ footer {
     }
 
     header h1 {
-        margin-bottom: 10px;
+        margin-bottom: 0;
     }
 
     #stepper {
