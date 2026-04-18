@@ -215,11 +215,11 @@ class LocalSortApp {
         if (isVideo) {
             const frameBlob = await this.ai.extractVideoFrame(file);
             result = await this.ai.labelImage(frameBlob, this.customLabels);
-            metadata = { date: null, make: 'Video', model: 'Generic' };
         } else {
             result = await this.ai.labelImage(file, this.customLabels);
-            metadata = await this.fs.extractMetadata(file);
         }
+        
+        metadata = await this.fs.extractMetadata(file, fileInfo.name);
 
         this.appState.processedFiles.set(fileInfo.name, {
             labels: result.results.map(r => r.label),

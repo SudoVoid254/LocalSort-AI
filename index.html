@@ -42,11 +42,7 @@
                         </p>
                     </div>
 
-                    <div class="threshold-container card-inset">
-                        <label class="labels-label">Confidence Threshold: <span id="threshold-value">50%</span></label>
-                        <input type="range" id="threshold-slider" min="0" max="100" value="50" style="width: 100%">
-                        <p class="labels-hint">Files below this confidence will go to "Review_Required" folder.</p>
-                    </div>
+
 
                     <button id="btn-select-folder" class="primary-btn">Select Folder</button>
                 </div>
@@ -80,6 +76,12 @@
                             <option value="camera-model">Organize by Camera/Date</option>
                             <option value="simple-label">Simple Label Folders</option>
                         </select>
+                    </div>
+
+                    <div class="threshold-container card-inset" style="margin-top: 20px; text-align: left;">
+                        <label class="labels-label">Confidence Threshold: <span id="threshold-value">50%</span></label>
+                        <input type="range" id="threshold-slider" min="0" max="100" value="50" style="width: 100%">
+                        <p class="labels-hint">Files below this confidence will go to "Review_Required" folder.</p>
                     </div>
                     <div class="actions">
                         <button id="btn-to-preview" class="primary-btn">Preview Structure</button>
