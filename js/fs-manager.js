@@ -122,25 +122,28 @@ export class FSManager {
             return { sourcePath, targetPath: sourcePath, status: 'skipped' };
         }
         const targetDir = await this.ensureDirectoryPath(this.rootHandle, targetPath);
-
-        const sourceFile = await sourceHandle.getFile();
-        const content = await sourceFile.arrayBuffer();
-
         const fileName = sourceHandle.name;
-        
-        const newFileHandle = await targetDir.getFileHandle(fileName, { create: true });
-        const writable = await newFileHandle.createWritable();
-        await writable.write(content);
-        await writable.close();
 
-        const normalizedSource = sourcePath.replace(/\\/g, '/');
-        const destinationPath = targetPath ? `${targetPath}/${fileName}` : fileName;
-        
-        if (normalizedSource !== destinationPath) {
-            await sourceHandle.remove({ recursive: false });
+        try {
+            const sourceFile = await sourceHandle.getFile();
+            const newFileHandle = await targetDir.getFileHandle(fileName, { create: true });
+            const writable = await newFileHandle.createWritable();
+            
+            // Stream the content to avoid loading the whole file into RAM
+            await sourceFile.stream().pipeTo(writable);
+
+            const normalizedSource = sourcePath.replace(/\\/g, '/');
+            const destinationPath = targetPath ? `${targetPath}/${fileName}` : fileName;
+            
+            if (normalizedSource !== destinationPath) {
+                await sourceHandle.remove({ recursive: false });
+            }
+
+            return { sourcePath, targetPath: destinationPath };
+        } catch (err) {
+            console.error(`Failed to move ${sourcePath}:`, err);
+            throw err;
         }
-
-        return { sourcePath, targetPath: destinationPath };
     }
 
     async ensureDirectoryPath(rootHandle, path) {

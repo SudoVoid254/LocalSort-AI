@@ -39,10 +39,10 @@ class LocalSortApp {
         // Check for File System Access API support
         if (!('showDirectoryPicker' in window)) {
             this.ui.updateStatusBar('fs-status', '❌ Browser not supported');
-            
+
             const isBrave = navigator.brave && typeof navigator.brave.isBrave === 'function';
             let msg = 'Your browser does not support the File System Access API. Please use a Chromium-based browser (Chrome, Edge, Brave).';
-            
+
             if (isBrave || navigator.userAgent.includes('Brave')) {
                 msg += '\n\nBRAVE USERS: Brave disables this API by default. To enable it:\n1. Go to brave://flags/#file-system-access-api\n2. Set to "Enabled"\n3. Relaunch Brave.';
             } else {
@@ -80,12 +80,12 @@ class LocalSortApp {
 
     async generatePreview() {
         if (this.previewTimeout) clearTimeout(this.previewTimeout);
-        
+
         return new Promise((resolve) => {
             this.previewTimeout = setTimeout(async () => {
                 // 1. Render the Thumbnail Gallery
                 await this.ui.renderGallery(this.appState.processedFiles, this.handleLabelChange.bind(this));
-                
+
                 this.renderTrees();
                 resolve();
             }, 100);
@@ -155,115 +155,101 @@ class LocalSortApp {
         const data = this.appState.processedFiles.get(fileName);
         if (data) {
             data.topLabel = newLabel;
-            data.labels = [newLabel]; 
+            data.labels = [newLabel];
             // Update trees without re-rendering the whole gallery
             this.renderTrees();
         }
     }
 
     async startLabeling() {
-        const files = this.appState.files.filter(f =>
-            f.name.match(/\.(jpg|jpeg|png|webp|mp4|mov)$/i)
-        );
+        const supportedExtensions = /\.(jpg|jpeg|png|webp|mp4|mov)$/i;
+        const filesToProcess = this.appState.files.filter(f => f.name.match(supportedExtensions));
 
-        if (files.length === 0) {
+        if (filesToProcess.length === 0) {
             this.ui.updateStatus('label-status', 'No supported media files found.');
             setTimeout(() => this.updateState('CONFIG'), 2000);
             return;
         }
 
-        if (!this.ai.isReady) {
-            this.ui.updateStatus('label-status', 'Waiting for AI model to load...');
-            await new Promise((resolve) => {
-                const checkInterval = setInterval(() => {
-                    if (this.ai.isReady) {
-                        clearInterval(checkInterval);
-                        resolve();
-                    }
-                }, 500);
-            });
-        }
+        await this.ensureAIReady();
 
         this.ui.updateStatusBar('ai-status', '🧠 AI: Analyzing...');
         this.ui.clearLog();
 
-        for (let i = 0; i < files.length; i++) {
-            const fileInfo = files[i];
-            this.ui.updateProgress('label-progress-bar', ((i + 1) / files.length) * 100);
-
-            this.ui.updateStatus('label-status', `Analyzing ${fileInfo.name}...`);
+        for (let i = 0; i < filesToProcess.length; i++) {
+            const fileInfo = filesToProcess[i];
+            const progress = ((i + 1) / filesToProcess.length) * 100;
+            
+            this.ui.updateProgress('label-progress-bar', progress);
+            this.ui.updateStatus('label-status', `Analyzing ${fileInfo.name} (${i + 1}/${filesToProcess.length})...`);
 
             try {
-                const file = await fileInfo.handle.getFile();
-
-                if (fileInfo.name.match(/\.(mp4|mov)$/i)) {
-                    try {
-                        const videoFile = await fileInfo.handle.getFile();
-                        const frameBlob = await this.ai.extractVideoFrame(videoFile);
-                        const result = await this.ai.labelImage(frameBlob, this.customLabels);
-
-                        this.appState.processedFiles.set(fileInfo.name, {
-                            labels: result.results.map(r => r.label),
-                            allResults: result.results,
-                            topLabel: result.top.label,
-                            confidence: result.top.score,
-                            originalPath: fileInfo.path,
-                            handle: fileInfo.handle,
-                            date: null 
-                        });
-                        const msg = `Labeled video ${fileInfo.name} as ${result.top.label} (${(result.top.score * 100).toFixed(1)}%)`;
-                        this.ui.updateStatus('label-status', msg);
-                        this.ui.addLogEntry(msg);
-                    } catch (err) {
-                        console.error(`Failed to process video ${fileInfo.name}:`, err);
-                        this.appState.processedFiles.set(fileInfo.name, {
-                            labels: ['video'],
-                            originalPath: fileInfo.path,
-                            handle: fileInfo.handle,
-                            date: null
-                        });
-                        this.ui.addLogEntry(`Error processing video ${fileInfo.name}: ${err.message}`);
-                    }
-                    continue;
-                }
-
-                const result = await this.ai.labelImage(file, this.customLabels);
-                const metadata = await this.fs.extractMetadata(file);
-
-                this.appState.processedFiles.set(fileInfo.name, {
-                    labels: result.results.map(r => r.label),
-                    allResults: result.results,
-                    topLabel: result.top.label,
-                    confidence: result.top.score,
-                    originalPath: fileInfo.path,
-                    handle: fileInfo.handle,
-                    date: metadata.date,
-                    make: metadata.make,
-                    model: metadata.model
-                });
-                const msg = `Labeled ${fileInfo.name} as ${result.top.label} (${(result.top.score * 100).toFixed(1)}%)`;
-                this.ui.updateStatus('label-status', msg);
-                this.ui.addLogEntry(msg);
+                await this.processSingleFile(fileInfo);
             } catch (err) {
-                console.error(`Failed to label ${fileInfo.name}:`, err);
-                this.appState.processedFiles.set(fileInfo.name, {
-                    labels: ['unknown'],
-                    allResults: [],
-                    topLabel: 'unknown',
-                    confidence: 0,
-                    originalPath: fileInfo.path,
-                    handle: fileInfo.handle,
-                    date: null
-                });
-                const msg = `Error labeling ${fileInfo.name}: ${err.message}`;
-                this.ui.updateStatus('label-status', msg);
-                this.ui.addLogEntry(msg);
+                console.error(`Failed to process ${fileInfo.name}:`, err);
+                this.handleProcessError(fileInfo, err);
             }
+            // Yield to UI thread
             await new Promise(requestAnimationFrame);
         }
 
         this.ui.updateStatusBar('ai-status', '🧠 AI: Ready');
         this.updateState('CONFIG');
+    }
+
+    async ensureAIReady() {
+        if (!this.ai.isReady) {
+            this.ui.updateStatus('label-status', 'Waiting for AI model to load...');
+            while (!this.ai.isReady) {
+                await new Promise(res => setTimeout(res, 500));
+            }
+        }
+    }
+
+    async processSingleFile(fileInfo) {
+        const isVideo = fileInfo.name.match(/\.(mp4|mov)$/i);
+        let result, metadata;
+
+        const file = await fileInfo.handle.getFile();
+
+        if (isVideo) {
+            const frameBlob = await this.ai.extractVideoFrame(file);
+            result = await this.ai.labelImage(frameBlob, this.customLabels);
+            metadata = { date: null, make: 'Video', model: 'Generic' };
+        } else {
+            result = await this.ai.labelImage(file, this.customLabels);
+            metadata = await this.fs.extractMetadata(file);
+        }
+
+        this.appState.processedFiles.set(fileInfo.name, {
+            labels: result.results.map(r => r.label),
+            allResults: result.results,
+            topLabel: result.top.label,
+            confidence: result.top.score,
+            originalPath: fileInfo.path,
+            handle: fileInfo.handle,
+            date: metadata.date,
+            make: metadata.make,
+            model: metadata.model
+        });
+
+        const msg = `Labeled ${fileInfo.name} as ${result.top.label} (${(result.top.score * 100).toFixed(1)}%)`;
+        this.ui.addLogEntry(msg);
+    }
+
+    handleProcessError(fileInfo, err) {
+        this.appState.processedFiles.set(fileInfo.name, {
+            labels: ['unknown'],
+            allResults: [],
+            topLabel: 'unknown',
+            confidence: 0,
+            originalPath: fileInfo.path,
+            handle: fileInfo.handle,
+            date: null
+        });
+        const msg = `Error labeling ${fileInfo.name}: ${err.message}`;
+        this.ui.updateStatus('label-status', msg);
+        this.ui.addLogEntry(msg);
     }
 
     handleAddRule() {
@@ -303,11 +289,11 @@ class LocalSortApp {
         }
 
         this.updateState('EXECUTION');
-        
+
         try {
             this.ui.updateStatus('execution-status', `Reversing ${this.appState.transactionLog.length} changes...`);
             await this.fs.rollback(this.appState.transactionLog);
-            
+
             this.ui.updateStatus('execution-status', 'Rollback complete!');
             this.appState.transactionLog = [];
         } catch (err) {
