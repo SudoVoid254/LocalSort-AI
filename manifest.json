@@ -5,7 +5,7 @@
   "protocol_handlers": [
     {
       "protocol": "web+localsort",
-      "url": "/index.html?query=%s"
+      "url": "index.html?query=%s"
     }
   ],
   "screenshots": [

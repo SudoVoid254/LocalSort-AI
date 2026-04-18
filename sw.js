@@ -1,4 +1,4 @@
-const CACHE_NAME = 'localsort-v2';
+const CACHE_NAME = 'localsort-v0.4.5';
 const ASSETS = [
   './',
   './index.html',
@@ -10,7 +10,8 @@ const ASSETS = [
   './js/config-store.js',
   './js/config-help.html',
   './css/styles.css',
-  './manifest.json'
+  './manifest.json',
+  './icons/icon-192.png'
 ];
 
 // Install: Cache core logic
