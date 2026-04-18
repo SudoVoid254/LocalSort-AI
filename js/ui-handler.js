@@ -6,6 +6,60 @@ export class UIHandler {
     constructor(app) {
         this.app = app;
         this.views = {};
+        this.activeBlobUrls = new Map(); // element -> { fileName, url }
+        
+        // Initialize IntersectionObserver for lazy loading
+        this.observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    this.loadImage(entry.target);
+                } else {
+                    this.unloadImage(entry.target);
+                }
+            });
+        }, { 
+            root: document.getElementById('preview-gallery'),
+            rootMargin: '200px' 
+        });
+    }
+
+    async loadImage(wrapper) {
+        const img = wrapper.querySelector('img');
+        const fileName = wrapper.dataset.fileName;
+        const data = this.app.appState.processedFiles.get(fileName);
+        
+        if (!data || img.src.startsWith('blob:')) return;
+
+        try {
+            const file = await data.handle.getFile();
+            const url = URL.createObjectURL(file);
+            img.src = url;
+            this.activeBlobUrls.set(wrapper, { fileName, url });
+        } catch (e) {
+            console.error(`Failed to load image ${fileName}:`, e);
+            img.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2318181b'/><text x='50%25' y='50%25' font-family='sans-serif' font-size='12' fill='%23a1a1aa' text-anchor='middle' dy='.3em'>Error</text></svg>`;
+        }
+    }
+
+    unloadImage(wrapper) {
+        const img = wrapper.querySelector('img');
+        const active = this.activeBlobUrls.get(wrapper);
+        
+        if (active) {
+            URL.revokeObjectURL(active.url);
+            this.activeBlobUrls.delete(wrapper);
+            img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Transparent pixel
+        }
+    }
+
+    cleanupGallery() {
+        this.observer.disconnect();
+        for (const [wrapper, active] of this.activeBlobUrls.entries()) {
+            URL.revokeObjectURL(active.url);
+        }
+        this.activeBlobUrls.clear();
+        const container = document.getElementById('preview-gallery');
+        if (container) container.innerHTML = '';
     }
 
     init() {
@@ -18,7 +72,8 @@ export class UIHandler {
         fetch('js/config-help.html')
             .then(r => r.text())
             .then(text => {
-                document.getElementById('config-help').innerHTML = text;
+                const helpEl = document.getElementById('config-help');
+                if (helpEl) helpEl.innerHTML = text;
             })
             .catch(e => console.error('Help failed to load', e));
     }
@@ -113,6 +168,11 @@ export class UIHandler {
         this.views.forEach(view => {
             view.classList.toggle('active', view.id === `view-${state}`);
         });
+        
+        // Cleanup if moving away from preview
+        if (state !== 'PREVIEW' && state !== 'EXECUTION') {
+            this.cleanupGallery();
+        }
     }
 
     updateStatusBar(id, text) {
@@ -146,6 +206,7 @@ export class UIHandler {
 
     renderRules(rules) {
         const container = document.getElementById('rules-container');
+        if (!container) return;
         container.innerHTML = '';
 
         rules.forEach((rule, index) => {
@@ -235,6 +296,7 @@ export class UIHandler {
 
     renderTree(containerId, tree) {
         const container = document.getElementById(containerId);
+        if (!container) return;
         container.innerHTML = '';
 
         if (Object.keys(tree).length === 0) {
@@ -264,13 +326,14 @@ export class UIHandler {
 
     async renderGallery(processedFiles, onLabelChange) {
         const container = document.getElementById('preview-gallery');
+        if (!container) return;
         
-        // 1. Cancel previous render if any
+        // 1. Cancel previous render and cleanup old URLs
         this.currentRenderId = (this.currentRenderId || 0) + 1;
         const myRenderId = this.currentRenderId;
         
-        container.innerHTML = '';
-
+        this.cleanupGallery();
+        
         const searchTerm = document.getElementById('preview-search')?.value.toLowerCase() || '';
         const confidenceFilter = document.getElementById('filter-confidence')?.value || '0';
 
@@ -278,7 +341,6 @@ export class UIHandler {
         const fragment = document.createDocumentFragment();
 
         for (const [fileName, data] of processedFiles.entries()) {
-            // Check if we should still be rendering
             if (myRenderId !== this.currentRenderId) return;
 
             // Apply filtering
@@ -296,6 +358,7 @@ export class UIHandler {
 
             const wrapper = document.createElement('div');
             wrapper.className = 'gallery-item-wrapper';
+            wrapper.dataset.fileName = fileName;
             wrapper.style.position = 'relative';
 
             const img = document.createElement('img');
@@ -304,7 +367,7 @@ export class UIHandler {
             img.style.height = '100px';
             img.style.objectFit = 'cover';
             img.style.cursor = 'pointer';
-            img.loading = 'lazy'; // Native lazy loading
+            img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Placeholder
 
             // Add confidence badge
             const badge = document.createElement('div');
@@ -320,55 +383,34 @@ export class UIHandler {
             badge.style.background = data.confidence > 0.7 ? 'rgba(34, 197, 94, 0.8)' : 'rgba(239, 68, 68, 0.8)';
             badge.style.color = 'white';
 
-            // Top 3 labels indicator
-            const top3 = (data.allResults || []).slice(0, 3).map(r => `${r.label} (${(r.score * 100).toFixed(0)}%)`).join('\n');
-            wrapper.title = `Top Matches:\n${top3}`;
-
             const imgContainer = document.createElement('div');
             imgContainer.style.position = 'relative';
             imgContainer.appendChild(img);
             imgContainer.appendChild(badge);
 
-            // 3. Cache Blob URLs to avoid lag and memory leaks
-            if (!data.blobUrl) {
-                try {
-                    const file = await data.handle.getFile();
-                    data.blobUrl = URL.createObjectURL(file);
-                } catch (e) {
-                    data.blobUrl = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2318181b'/><text x='50%25' y='50%25' font-family='sans-serif' font-size='12' fill='%23a1a1aa' text-anchor='middle' dy='.3em'>Error</text></svg>`;
-                }
-            }
-            img.src = data.blobUrl;
+            const top3 = (data.allResults || []).slice(0, 3).map(r => `${r.label} (${(r.score * 100).toFixed(0)}%)`).join('\n');
+            wrapper.title = `Top Matches:\n${top3}`;
 
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'gallery-input';
             input.value = data.topLabel || data.labels[0] || '';
-            input.style.width = '90px';
-            input.style.fontSize = '0.7rem';
-            input.style.marginTop = '5px';
-            input.style.textAlign = 'center';
-            input.style.background = 'var(--bg-color)';
-            input.style.color = 'var(--text-main)';
-            input.style.border = '1px solid var(--border-color)';
-            input.style.borderRadius = '4px';
-
-            input.addEventListener('change', (e) => {
-                onLabelChange(fileName, e.target.value);
-            });
+            input.addEventListener('change', (e) => onLabelChange(fileName, e.target.value));
 
             wrapper.appendChild(imgContainer);
             wrapper.appendChild(input);
+            
+            this.observer.observe(wrapper);
             fragment.appendChild(wrapper);
             
-            // Periodically flush fragment to keep UI responsive
-            if (fragment.children.length % 20 === 0) {
+            if (fragment.children.length % 50 === 0) {
                 container.appendChild(fragment);
                 await new Promise(requestAnimationFrame);
             }
         }
         container.appendChild(fragment);
     }
+
 
     validateRules() {
         const inputs = document.querySelectorAll('.rule-row input[data-field="target"]');
