@@ -53,6 +53,7 @@ export class ConfigStore {
             month: (date.getMonth() + 1).toString().padStart(2, '0'),
             day: date.getDate().toString().padStart(2, '0'),
             label: fileData.topLabel || 'unknown',
+            labels: (fileData.labels || []).join(', '),
             make: fileData.make || 'Unknown',
             model: fileData.model || 'Unknown',
             confidence: (fileData.confidence * 100).toFixed(0) + '%'
@@ -61,15 +62,26 @@ export class ConfigStore {
         for (const rule of this.rules) {
             if (rule.type === 'label') {
                 const label = fileData.topLabel || 'unknown';
+                const allLabels = (fileData.labels || []).map(l => l.toLowerCase());
 
-                const isNegation = rule.pattern.startsWith('!');
-                const actualPattern = isNegation ? rule.pattern.substring(1) : rule.pattern;
+                let shouldApply = false;
+                const pattern = rule.pattern.trim();
 
-                const matches = new RegExp(actualPattern, 'i').test(label);
-                const shouldApply = isNegation ? !matches : matches;
+                if (pattern.includes(',')) {
+                    // Multi-label AND logic
+                    const required = pattern.split(',').map(l => l.trim().toLowerCase());
+                    shouldApply = required.every(rl => allLabels.includes(rl));
+                } else {
+                    // Standard regex logic on primary label
+                    const isNegation = pattern.startsWith('!');
+                    const actualPattern = isNegation ? pattern.substring(1) : pattern;
+                    const regex = new RegExp(actualPattern === '.*' ? '^.*$' : `^${actualPattern}$`, 'i');
+                    const matches = regex.test(label);
+                    shouldApply = isNegation ? !matches : matches;
+                }
 
                 if (shouldApply) {
-                    // Expand placeholders: {year}, {month}, {day}, {label}, {make}, {model}, {confidence}
+                    // Expand placeholders: {year}, {month}, {day}, {label}, {labels}, {make}, {model}, {confidence}
                     return rule.target.replace(/{(\w+)}/g, (match, key) => {
                         return dataMap[key] || match;
                     });

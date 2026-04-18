@@ -1,4 +1,4 @@
-const CACHE_NAME = 'localsort-v0.4.5';
+const CACHE_NAME = 'localsort-v0.4.6';
 const ASSETS = [
   './',
   './index.html',

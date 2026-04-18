@@ -209,6 +209,20 @@ export class UIHandler {
         if (!container) return;
         container.innerHTML = '';
 
+        // Create or update datalist for suggestions
+        let datalist = document.getElementById('label-suggestions');
+        if (!datalist) {
+            datalist = document.createElement('datalist');
+            datalist.id = 'label-suggestions';
+            document.body.appendChild(datalist);
+        }
+        const labels = Array.from(new Set([
+            '.*', 'unknown', 
+            ...(this.app.customLabels || []), 
+            ...this.app.ai.defaultLabels
+        ]));
+        datalist.innerHTML = labels.map(l => `<option value="${l}">`).join('');
+
         rules.forEach((rule, index) => {
             const div = document.createElement('div');
             div.className = 'rule-item';
@@ -222,16 +236,10 @@ export class UIHandler {
             div.innerHTML = `
                 <div class="rule-drag-handle" style="cursor: grab; color: var(--text-muted);">☰</div>
                 <div class="rule-row">
-                    <span style="font-size: 0.9rem">If label is </span>
-                    <select class="rule-input" data-index="${index}" data-field="pattern" style="padding: 4px;">
-                        <option value=".*" ${rule.pattern === '.*' ? 'selected' : ''}>Any Label</option>
-                        ${(this.app.customLabels || this.app.ai.defaultLabels).map(label =>
-                            `<option value="${label}" ${rule.pattern === label ? 'selected' : ''}>${label.charAt(0).toUpperCase() + label.slice(1)}</option>`
-                        ).join('')}
-                        <option value="unknown" ${rule.pattern === 'unknown' ? 'selected' : ''}>Unknown</option>
-                    </select>
+                    <span style="font-size: 0.9rem">If labels match </span>
+                    <input list="label-suggestions" class="rule-input" data-index="${index}" data-field="pattern" value="${rule.pattern}" style="width: 140px; padding: 4px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
                     <span style="font-size: 0.9rem"> move to </span>
-                    <input type="text" class="rule-input" value="${rule.target}" data-index="${index}" data-field="target" style="width: 150px; padding: 4px;">
+                    <input type="text" class="rule-input" value="${rule.target}" data-index="${index}" data-field="target" style="width: 180px; padding: 4px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
                     <button class="secondary-btn btn-sm" data-index="${index}" style="margin-left: 10px; padding: 5px 10px;">Delete</button>
                 </div>
             `;
