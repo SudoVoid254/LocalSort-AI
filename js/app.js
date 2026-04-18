@@ -79,9 +79,20 @@ class LocalSortApp {
     }
 
     async generatePreview() {
-        // 1. Render the Thumbnail Gallery
-        await this.ui.renderGallery(this.appState.processedFiles, this.handleLabelChange.bind(this));
+        if (this.previewTimeout) clearTimeout(this.previewTimeout);
+        
+        return new Promise((resolve) => {
+            this.previewTimeout = setTimeout(async () => {
+                // 1. Render the Thumbnail Gallery
+                await this.ui.renderGallery(this.appState.processedFiles, this.handleLabelChange.bind(this));
+                
+                this.renderTrees();
+                resolve();
+            }, 100);
+        });
+    }
 
+    renderTrees() {
         // 2. Current Structure
         const currentTree = {};
         for (const [name, data] of this.appState.processedFiles.entries()) {
@@ -144,9 +155,9 @@ class LocalSortApp {
         const data = this.appState.processedFiles.get(fileName);
         if (data) {
             data.topLabel = newLabel;
-            data.labels = [newLabel]; // Compatibility with rules
-            // Re-generate tree immediately to show the impact of the change
-            this.generatePreview();
+            data.labels = [newLabel]; 
+            // Update trees without re-rendering the whole gallery
+            this.renderTrees();
         }
     }
 

@@ -37,13 +37,21 @@ self.onmessage = async (e) => {
             const { imageBlob, labels } = payload;
             imageUrl = URL.createObjectURL(imageBlob);
 
-            const result = await classifier(imageUrl, labels);
+            // Improve zero-shot performance with prompts
+            const promptedLabels = labels.map(l => `a photo of ${l}`);
+            const result = await classifier(imageUrl, promptedLabels);
             
+            // Map back to original labels
+            const mappedResults = result.map(r => ({
+                label: r.label.replace('a photo of ', ''),
+                score: r.score
+            }));
+
             self.postMessage({
                 type: 'RESULT',
                 payload: {
-                    results: result.map(r => ({ label: r.label, score: r.score })),
-                    top: result[0]
+                    results: mappedResults,
+                    top: mappedResults[0]
                 }
             });
         } catch (err) {

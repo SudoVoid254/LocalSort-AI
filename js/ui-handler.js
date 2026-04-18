@@ -264,20 +264,29 @@ export class UIHandler {
 
     async renderGallery(processedFiles, onLabelChange) {
         const container = document.getElementById('preview-gallery');
+        
+        // 1. Cancel previous render if any
+        this.currentRenderId = (this.currentRenderId || 0) + 1;
+        const myRenderId = this.currentRenderId;
+        
         container.innerHTML = '';
 
         const searchTerm = document.getElementById('preview-search')?.value.toLowerCase() || '';
         const confidenceFilter = document.getElementById('filter-confidence')?.value || '0';
 
+        // 2. Fragment for better performance
+        const fragment = document.createDocumentFragment();
+
         for (const [fileName, data] of processedFiles.entries()) {
+            // Check if we should still be rendering
+            if (myRenderId !== this.currentRenderId) return;
+
             // Apply filtering
             const label = (data.topLabel || '').toLowerCase();
             const name = fileName.toLowerCase();
             
-            // Search filter
             if (searchTerm && !label.includes(searchTerm) && !name.includes(searchTerm)) continue;
 
-            // Confidence filter
             if (confidenceFilter === 'low') {
                 if (data.confidence >= this.app.config.confidenceThreshold) continue;
             } else {
@@ -287,8 +296,6 @@ export class UIHandler {
 
             const wrapper = document.createElement('div');
             wrapper.className = 'gallery-item-wrapper';
-            wrapper.style.textAlign = 'center';
-            wrapper.style.fontSize = '0.8rem';
             wrapper.style.position = 'relative';
 
             const img = document.createElement('img');
@@ -297,6 +304,7 @@ export class UIHandler {
             img.style.height = '100px';
             img.style.objectFit = 'cover';
             img.style.cursor = 'pointer';
+            img.loading = 'lazy'; // Native lazy loading
 
             // Add confidence badge
             const badge = document.createElement('div');
@@ -312,17 +320,25 @@ export class UIHandler {
             badge.style.background = data.confidence > 0.7 ? 'rgba(34, 197, 94, 0.8)' : 'rgba(239, 68, 68, 0.8)';
             badge.style.color = 'white';
 
+            // Top 3 labels indicator
+            const top3 = (data.allResults || []).slice(0, 3).map(r => `${r.label} (${(r.score * 100).toFixed(0)}%)`).join('\n');
+            wrapper.title = `Top Matches:\n${top3}`;
+
             const imgContainer = document.createElement('div');
             imgContainer.style.position = 'relative';
             imgContainer.appendChild(img);
             imgContainer.appendChild(badge);
 
-            try {
-                const file = await data.handle.getFile();
-                img.src = URL.createObjectURL(file);
-            } catch (e) {
-                img.src = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2318181b'/><text x='50%25' y='50%25' font-family='sans-serif' font-size='12' fill='%23a1a1aa' text-anchor='middle' dy='.3em'>No Preview</text></svg>`;
+            // 3. Cache Blob URLs to avoid lag and memory leaks
+            if (!data.blobUrl) {
+                try {
+                    const file = await data.handle.getFile();
+                    data.blobUrl = URL.createObjectURL(file);
+                } catch (e) {
+                    data.blobUrl = `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2318181b'/><text x='50%25' y='50%25' font-family='sans-serif' font-size='12' fill='%23a1a1aa' text-anchor='middle' dy='.3em'>Error</text></svg>`;
+                }
             }
+            img.src = data.blobUrl;
 
             const input = document.createElement('input');
             input.type = 'text';
@@ -343,8 +359,15 @@ export class UIHandler {
 
             wrapper.appendChild(imgContainer);
             wrapper.appendChild(input);
-            container.appendChild(wrapper);
+            fragment.appendChild(wrapper);
+            
+            // Periodically flush fragment to keep UI responsive
+            if (fragment.children.length % 20 === 0) {
+                container.appendChild(fragment);
+                await new Promise(requestAnimationFrame);
+            }
         }
+        container.appendChild(fragment);
     }
 
     validateRules() {
