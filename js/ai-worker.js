@@ -38,13 +38,12 @@ self.onmessage = async (e) => {
             imageUrl = URL.createObjectURL(imageBlob);
 
             const result = await classifier(imageUrl, labels);
-            const top = result[0];
-
+            
             self.postMessage({
                 type: 'RESULT',
                 payload: {
-                    label: top.score > 0.3 ? top.label : 'unknown',
-                    confidence: top.score
+                    results: result.map(r => ({ label: r.label, score: r.score })),
+                    top: result[0]
                 }
             });
         } catch (err) {

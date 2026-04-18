@@ -39,6 +39,12 @@
                         </p>
                     </div>
 
+                    <div class="threshold-container card-inset">
+                        <label class="labels-label">Confidence Threshold: <span id="threshold-value">50%</span></label>
+                        <input type="range" id="threshold-slider" min="0" max="100" value="50" style="width: 100%">
+                        <p class="labels-hint">Files below this confidence will go to "Review_Required" folder.</p>
+                    </div>
+
                     <button id="btn-select-folder" class="primary-btn">Select Folder</button>
                 </div>
             </section>
@@ -63,7 +69,15 @@
                     <p>Define how you want your files organized.</p>
                     <div id="config-help"></div>
                     <div id="rules-container"></div>
-                    <button id="btn-add-rule" class="secondary-btn">+ Add Rule</button>
+                    <div class="rules-actions">
+                        <button id="btn-add-rule" class="secondary-btn">+ Add Rule</button>
+                        <select id="preset-select" class="secondary-btn">
+                            <option value="">Load Preset...</option>
+                            <option value="date-label">Organize by Label/Date</option>
+                            <option value="camera-model">Organize by Camera/Date</option>
+                            <option value="simple-label">Simple Label Folders</option>
+                        </select>
+                    </div>
                     <div class="actions">
                         <button id="btn-to-preview" class="primary-btn">Preview Structure</button>
                     </div>
@@ -73,6 +87,18 @@
             <section id="view-PREVIEW" class="view">
                 <div class="card">
                     <h2>Proposed Organization</h2>
+
+                    <div class="preview-controls">
+                        <div class="search-group">
+                            <input type="text" id="preview-search" placeholder="Search by label or filename...">
+                            <select id="filter-confidence">
+                                <option value="0">All Confidence</option>
+                                <option value="0.7">> 70% Confidence</option>
+                                <option value="0.9">> 90% Confidence</option>
+                                <option value="low">Review Required (&lt; Threshold)</option>
+                            </select>
+                        </div>
+                    </div>
 
                     <div id="preview-gallery" class="gallery-container">
                         <!-- Thumbnails will be injected here -->

@@ -19,48 +19,30 @@ export class FSManager {
      * @param {Blob} blob The image blob
      * @returns {Promise<Date|null>} The extracted date or null
      */
-    async extractExifDate(blob) {
+    /**
+     * Extracts EXIF metadata (Date, Make, Model) from a JPEG file.
+     * @param {Blob} blob The image blob
+     * @returns {Promise<Object>} Metadata object
+     */
+    async extractMetadata(blob) {
+        const metadata = { date: null, make: 'Unknown', model: 'Unknown' };
         try {
             const buffer = await blob.slice(0, 128 * 1024).arrayBuffer();
             const view = new DataView(buffer);
 
-            if (view.getUint16(0) !== 0xFFD8) return null; // Not a JPEG
+            if (view.getUint16(0) !== 0xFFD8) return metadata;
 
             let offset = 2;
             while (offset + 4 < view.byteLength) {
                 const marker = view.getUint16(offset);
                 if (marker === 0xFFE1) {
-                    // APP1 marker (EXIF)
                     const segmentLength = view.getUint16(offset + 2);
-                    if (offset + segmentLength + 2 > view.byteLength) break;
-                    if (view.getUint32(offset + 4, false) === 0x45584946) { // "Exif"
+                    if (view.getUint32(offset + 4, false) === 0x45584946) {
                         const tiffOffset = offset + 10;
                         const isLittleEndian = view.getUint16(tiffOffset) === 0x4949;
-
-                        // First IFD offset
                         const ifdOffset = view.getUint32(tiffOffset + 4, isLittleEndian);
-                        const ifdStart = tiffOffset + ifdOffset;
-                        const numEntries = view.getUint16(ifdStart, isLittleEndian);
-
-                        for (let i = 0; i < numEntries; i++) {
-                            const entryOffset = ifdStart + 2 + (i * 12);
-                            if (entryOffset + 12 > view.byteLength) break;
-                            const tag = view.getUint16(entryOffset, isLittleEndian);
-                            if (tag === 0x9003) { // DateTimeOriginal
-                                const valueOffset = view.getUint32(entryOffset + 8, isLittleEndian);
-                                const dataOffset = valueOffset < 4 ? entryOffset + 8 : tiffOffset + valueOffset;
-
-                                let dateStr = '';
-                                for (let j = 0; j < 19; j++) {
-                                    dateStr += String.fromCharCode(view.getUint8(dataOffset + j));
-                                }
-                                // Format: YYYY:MM:DD HH:MM:SS
-                                const parts = dateStr.split(/[: ]/);
-                                if (parts.length >= 6) {
-                                    return new Date(parts[0], parts[1] - 1, parts[2], parts[3], parts[4], parts[5]);
-                                }
-                            }
-                        }
+                        
+                        this.parseIFD(view, tiffOffset, ifdOffset, isLittleEndian, metadata);
                     }
                     offset += 2 + segmentLength;
                 } else {
@@ -68,9 +50,53 @@ export class FSManager {
                 }
             }
         } catch (e) {
-            console.warn('EXIF extraction failed:', e);
+            console.warn('Metadata extraction failed:', e);
         }
-        return null;
+        return metadata;
+    }
+
+    parseIFD(view, tiffOffset, ifdOffset, isLittleEndian, metadata) {
+        const ifdStart = tiffOffset + ifdOffset;
+        if (ifdStart + 2 > view.byteLength) return;
+        
+        const numEntries = view.getUint16(ifdStart, isLittleEndian);
+
+        for (let i = 0; i < numEntries; i++) {
+            const entryOffset = ifdStart + 2 + (i * 12);
+            if (entryOffset + 12 > view.byteLength) break;
+            const tag = view.getUint16(entryOffset, isLittleEndian);
+            
+            if (tag === 0x010F) { // Make
+                metadata.make = this.readExifString(view, tiffOffset, entryOffset, isLittleEndian);
+            } else if (tag === 0x0110) { // Model
+                metadata.model = this.readExifString(view, tiffOffset, entryOffset, isLittleEndian);
+            } else if (tag === 0x8769) { // Exif IFD Pointer
+                const exifOffset = view.getUint32(entryOffset + 8, isLittleEndian);
+                this.parseIFD(view, tiffOffset, exifOffset, isLittleEndian, metadata);
+            } else if (tag === 0x9003) { // DateTimeOriginal
+                const dateStr = this.readExifString(view, tiffOffset, entryOffset, isLittleEndian, 19);
+                const parts = dateStr.split(/[: ]/);
+                if (parts.length >= 6) {
+                    metadata.date = new Date(parts[0], parts[1] - 1, parts[2], parts[3], parts[4], parts[5]);
+                }
+            }
+        }
+    }
+
+    readExifString(view, tiffOffset, entryOffset, isLittleEndian, fixedLength = null) {
+        const count = view.getUint32(entryOffset + 4, isLittleEndian);
+        const valueOffset = view.getUint32(entryOffset + 8, isLittleEndian);
+        const dataOffset = count <= 4 ? entryOffset + 8 : tiffOffset + valueOffset;
+        
+        let str = '';
+        const len = fixedLength || count;
+        for (let j = 0; j < len; j++) {
+            if (dataOffset + j >= view.byteLength) break;
+            const charCode = view.getUint8(dataOffset + j);
+            if (charCode === 0) break; // Null terminator
+            str += String.fromCharCode(charCode);
+        }
+        return str.trim();
     }
 
     async scanDirectory(handle, path = '') {

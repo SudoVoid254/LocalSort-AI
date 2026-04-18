@@ -71,14 +71,7 @@ class LocalSortApp {
 
     async generatePreview() {
         // 1. Render the Thumbnail Gallery
-        await this.ui.renderGallery(this.appState.processedFiles, (fileName, newLabel) => {
-            const data = this.appState.processedFiles.get(fileName);
-            if (data) {
-                data.labels = [newLabel];
-                // Re-generate tree immediately to show the impact of the change
-                this.generatePreview();
-            }
-        });
+        await this.ui.renderGallery(this.appState.processedFiles, this.handleLabelChange.bind(this));
 
         // 2. Current Structure
         const currentTree = {};
@@ -138,6 +131,16 @@ class LocalSortApp {
         }
     }
 
+    handleLabelChange(fileName, newLabel) {
+        const data = this.appState.processedFiles.get(fileName);
+        if (data) {
+            data.topLabel = newLabel;
+            data.labels = [newLabel]; // Compatibility with rules
+            // Re-generate tree immediately to show the impact of the change
+            this.generatePreview();
+        }
+    }
+
     async startLabeling() {
         const files = this.appState.files.filter(f =>
             f.name.match(/\.(jpg|jpeg|png|webp|mp4|mov)$/i)
@@ -180,12 +183,15 @@ class LocalSortApp {
                         const result = await this.ai.labelImage(frameBlob, this.customLabels);
 
                         this.appState.processedFiles.set(fileInfo.name, {
-                            labels: [result.label],
+                            labels: result.results.map(r => r.label),
+                            allResults: result.results,
+                            topLabel: result.top.label,
+                            confidence: result.top.score,
                             originalPath: fileInfo.path,
                             handle: fileInfo.handle,
-                            date: null // Videos often lack standard EXIF date, fallback to file date in config-store
+                            date: null 
                         });
-                        const msg = `Labeled video ${fileInfo.name} as ${result.label}`;
+                        const msg = `Labeled video ${fileInfo.name} as ${result.top.label} (${(result.top.score * 100).toFixed(1)}%)`;
                         this.ui.updateStatus('label-status', msg);
                         this.ui.addLogEntry(msg);
                     } catch (err) {
@@ -202,21 +208,29 @@ class LocalSortApp {
                 }
 
                 const result = await this.ai.labelImage(file, this.customLabels);
-                const captureDate = await this.fs.extractExifDate(file);
+                const metadata = await this.fs.extractMetadata(file);
 
                 this.appState.processedFiles.set(fileInfo.name, {
-                    labels: [result.label],
+                    labels: result.results.map(r => r.label),
+                    allResults: result.results,
+                    topLabel: result.top.label,
+                    confidence: result.top.score,
                     originalPath: fileInfo.path,
                     handle: fileInfo.handle,
-                    date: captureDate
+                    date: metadata.date,
+                    make: metadata.make,
+                    model: metadata.model
                 });
-                const msg = `Labeled ${fileInfo.name} as ${result.label}`;
+                const msg = `Labeled ${fileInfo.name} as ${result.top.label} (${(result.top.score * 100).toFixed(1)}%)`;
                 this.ui.updateStatus('label-status', msg);
                 this.ui.addLogEntry(msg);
             } catch (err) {
                 console.error(`Failed to label ${fileInfo.name}:`, err);
                 this.appState.processedFiles.set(fileInfo.name, {
                     labels: ['unknown'],
+                    allResults: [],
+                    topLabel: 'unknown',
+                    confidence: 0,
                     originalPath: fileInfo.path,
                     handle: fileInfo.handle,
                     date: null
@@ -282,6 +296,31 @@ class LocalSortApp {
         }
 
         setTimeout(() => this.updateState('PREVIEW'), 2000);
+    }
+
+    handleLoadPreset(presetId) {
+        let rules = [];
+        switch (presetId) {
+            case 'date-label':
+                rules = [
+                    { id: '1', type: 'label', pattern: '.*', target: 'Organized/{label}/{year}' }
+                ];
+                break;
+            case 'camera-model':
+                rules = [
+                    { id: '1', type: 'label', pattern: '.*', target: 'Equipment/{make}/{model}/{year}' }
+                ];
+                break;
+            case 'simple-label':
+                rules = [
+                    { id: '1', type: 'label', pattern: '.*', target: '{label}' }
+                ];
+                break;
+            default:
+                return;
+        }
+        this.config.saveRules(rules);
+        this.ui.renderRules(rules);
     }
 }
 

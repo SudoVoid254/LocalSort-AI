@@ -72,6 +72,35 @@ export class UIHandler {
         if (btnFinish) {
             btnFinish.addEventListener('click', () => this.app.handleFinishExecution());
         }
+
+        // Phase 4 events
+        const searchInput = document.getElementById('preview-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', () => this.renderGallery(this.app.appState.processedFiles, this.app.handleLabelChange.bind(this.app)));
+        }
+
+        const confidenceFilter = document.getElementById('filter-confidence');
+        if (confidenceFilter) {
+            confidenceFilter.addEventListener('change', () => this.renderGallery(this.app.appState.processedFiles, this.app.handleLabelChange.bind(this.app)));
+        }
+
+        const presetSelect = document.getElementById('preset-select');
+        if (presetSelect) {
+            presetSelect.addEventListener('change', (e) => this.app.handleLoadPreset(e.target.value));
+        }
+
+        const thresholdSlider = document.getElementById('threshold-slider');
+        const thresholdValue = document.getElementById('threshold-value');
+        if (thresholdSlider) {
+            thresholdSlider.value = this.app.config.confidenceThreshold * 100;
+            thresholdValue.textContent = `${thresholdSlider.value}%`;
+            
+            thresholdSlider.addEventListener('input', (e) => {
+                const val = e.target.value;
+                thresholdValue.textContent = `${val}%`;
+                this.app.config.saveThreshold(val / 100);
+            });
+        }
     }
 
     updateStepper(state) {
@@ -122,12 +151,15 @@ export class UIHandler {
         rules.forEach((rule, index) => {
             const div = document.createElement('div');
             div.className = 'rule-item';
+            div.draggable = true;
+            div.dataset.index = index;
             div.style.display = 'flex';
             div.style.alignItems = 'center';
             div.style.gap = '10px';
             div.style.justifyContent = 'center';
 
             div.innerHTML = `
+                <div class="rule-drag-handle" style="cursor: grab; color: var(--text-muted);">☰</div>
                 <div class="rule-row">
                     <span style="font-size: 0.9rem">If label is </span>
                     <select class="rule-input" data-index="${index}" data-field="pattern" style="padding: 4px;">
@@ -142,6 +174,41 @@ export class UIHandler {
                     <button class="secondary-btn btn-sm" data-index="${index}" style="margin-left: 10px; padding: 5px 10px;">Delete</button>
                 </div>
             `;
+            
+            // Drag events
+            div.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', index);
+                div.style.opacity = '0.5';
+            });
+
+            div.addEventListener('dragend', () => {
+                div.style.opacity = '1';
+                this.renderRules(this.app.config.rules);
+            });
+
+            div.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                div.style.borderTop = '2px solid var(--primary)';
+            });
+
+            div.addEventListener('dragleave', () => {
+                div.style.borderTop = '1px solid var(--border-color)';
+            });
+
+            div.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                const toIndex = index;
+                
+                if (fromIndex !== toIndex) {
+                    const rules = [...this.app.config.rules];
+                    const [movedRule] = rules.splice(fromIndex, 1);
+                    rules.splice(toIndex, 0, movedRule);
+                    this.app.config.saveRules(rules);
+                    this.renderRules(rules);
+                }
+            });
+
             container.appendChild(div);
         });
 
@@ -199,11 +266,30 @@ export class UIHandler {
         const container = document.getElementById('preview-gallery');
         container.innerHTML = '';
 
+        const searchTerm = document.getElementById('preview-search')?.value.toLowerCase() || '';
+        const confidenceFilter = document.getElementById('filter-confidence')?.value || '0';
+
         for (const [fileName, data] of processedFiles.entries()) {
+            // Apply filtering
+            const label = (data.topLabel || '').toLowerCase();
+            const name = fileName.toLowerCase();
+            
+            // Search filter
+            if (searchTerm && !label.includes(searchTerm) && !name.includes(searchTerm)) continue;
+
+            // Confidence filter
+            if (confidenceFilter === 'low') {
+                if (data.confidence >= this.app.config.confidenceThreshold) continue;
+            } else {
+                const minConfidence = parseFloat(confidenceFilter);
+                if (data.confidence < minConfidence) continue;
+            }
+
             const wrapper = document.createElement('div');
             wrapper.className = 'gallery-item-wrapper';
             wrapper.style.textAlign = 'center';
             wrapper.style.fontSize = '0.8rem';
+            wrapper.style.position = 'relative';
 
             const img = document.createElement('img');
             img.className = 'gallery-item';
@@ -212,8 +298,25 @@ export class UIHandler {
             img.style.objectFit = 'cover';
             img.style.cursor = 'pointer';
 
-            // In a real FS Access API app, we'd create a URL from the handle
-            // For this demo, we'll try to get the file and create a blob URL
+            // Add confidence badge
+            const badge = document.createElement('div');
+            badge.className = 'confidence-badge';
+            const confidencePercent = (data.confidence * 100).toFixed(0);
+            badge.textContent = `${confidencePercent}%`;
+            badge.style.position = 'absolute';
+            badge.style.top = '5px';
+            badge.style.right = '5px';
+            badge.style.fontSize = '0.6rem';
+            badge.style.padding = '2px 4px';
+            badge.style.borderRadius = '4px';
+            badge.style.background = data.confidence > 0.7 ? 'rgba(34, 197, 94, 0.8)' : 'rgba(239, 68, 68, 0.8)';
+            badge.style.color = 'white';
+
+            const imgContainer = document.createElement('div');
+            imgContainer.style.position = 'relative';
+            imgContainer.appendChild(img);
+            imgContainer.appendChild(badge);
+
             try {
                 const file = await data.handle.getFile();
                 img.src = URL.createObjectURL(file);
@@ -224,7 +327,7 @@ export class UIHandler {
             const input = document.createElement('input');
             input.type = 'text';
             input.className = 'gallery-input';
-            input.value = data.labels[0] || '';
+            input.value = data.topLabel || data.labels[0] || '';
             input.style.width = '90px';
             input.style.fontSize = '0.7rem';
             input.style.marginTop = '5px';
@@ -238,8 +341,7 @@ export class UIHandler {
                 onLabelChange(fileName, e.target.value);
             });
 
-            wrapper.appendChild(img);
-            wrapper.appendChild(document.createElement('br'));
+            wrapper.appendChild(imgContainer);
             wrapper.appendChild(input);
             container.appendChild(wrapper);
         }
