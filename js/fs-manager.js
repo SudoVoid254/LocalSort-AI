@@ -27,26 +27,34 @@ export class FSManager {
     async extractMetadata(file, fileName) {
         const metadata = { date: null, make: 'Unknown', model: 'Unknown' };
         
-        // 1. Try to parse date from filename first (very common fallback)
         const nameDate = this.parseDateFromFilename(fileName);
         if (nameDate) metadata.date = nameDate;
 
         try {
-            const buffer = await file.slice(0, 256 * 1024).arrayBuffer();
+            const buffer = await file.slice(0, 512 * 1024).arrayBuffer();
             const view = new DataView(buffer);
 
-            // 2. Check for JPEG (0xFFD8)
             if (view.byteLength > 2 && view.getUint16(0) === 0xFFD8) {
                 this.parseJpegMetadata(view, metadata);
             } 
-            // 3. Check for HEIC/MP4/MOV
             else if (this.isIsoMediaFile(view)) {
                 this.parseIsoMediaMetadata(view, metadata);
             }
         } catch (e) {
             console.warn('Metadata extraction failed:', e);
         }
+
+        // Sanitize for path safety
+        metadata.make = this.sanitizeMetadata(metadata.make);
+        metadata.model = this.sanitizeMetadata(metadata.model);
+
         return metadata;
+    }
+
+    sanitizeMetadata(str) {
+        if (!str) return 'Unknown';
+        // Remove slashes, backslashes, and null characters to prevent path injection/errors
+        return str.replace(/[\\/\0]/g, '-').trim() || 'Unknown';
     }
 
     isIsoMediaFile(view) {
@@ -81,12 +89,13 @@ export class FSManager {
             metadata.model = 'HEIC Image';
         } else {
             metadata.make = 'Video';
-            metadata.model = 'MP4/MOV';
+            metadata.model = 'MP4-MOV';
         }
 
-        // Search for creation time in 'mvhd' atom
-        for (let i = 0; i < Math.min(view.byteLength - 20, 1024 * 64); i++) {
-            if (view.getUint32(i) === 0x6D766864) { // 'mvhd'
+        // Search for 'mvhd' (date) and 'hdlr' (device info)
+        for (let i = 0; i < Math.min(view.byteLength - 20, view.byteLength); i++) {
+            const tag = view.getUint32(i);
+            if (tag === 0x6D766864) { // 'mvhd'
                 const version = view.getUint8(i + 4);
                 let creationTime;
                 if (version === 1) {
@@ -97,21 +106,23 @@ export class FSManager {
                 const epoch1904 = new Date('1904-01-01T00:00:00Z').getTime();
                 const date = new Date(epoch1904 + creationTime * 1000);
                 if (date.getFullYear() > 1980) metadata.date = date;
-                break;
+            } else if (tag === 0x68646C72) { // 'hdlr'
+                // Some device info is often near the handler atom in metadata
+                const componentName = this.readString(view, i + 24, 16);
+                if (componentName.includes('Apple')) metadata.make = 'Apple';
             }
         }
     }
 
     parseJpegMetadata(view, metadata) {
         let offset = 2;
-        while (offset + 4 < view.byteLength) {
+        while (offset + 10 < view.byteLength) {
             const marker = view.getUint16(offset);
             if (marker === 0xFFE1) {
                 const segmentLength = view.getUint16(offset + 2);
-                if (view.getUint32(offset + 4, false) === 0x45584946) {
+                const sig = this.readString(view, offset + 4, 4);
+                if (sig === 'Exif') {
                     const tiffOffset = offset + 10;
-                    if (tiffOffset + 8 > view.byteLength) break;
-                    
                     const isLittleEndian = view.getUint16(tiffOffset) === 0x4949;
                     const ifdOffset = view.getUint32(tiffOffset + 4, isLittleEndian);
                     this.parseIFD(view, tiffOffset, ifdOffset, isLittleEndian, metadata);
@@ -130,7 +141,10 @@ export class FSManager {
         let str = '';
         for (let i = 0; i < length; i++) {
             if (offset + i >= view.byteLength) break;
-            str += String.fromCharCode(view.getUint8(offset + i));
+            const charCode = view.getUint8(offset + i);
+            if (charCode > 31 && charCode < 127) { // Only printable ASCII
+                str += String.fromCharCode(charCode);
+            }
         }
         return str.trim();
     }
@@ -180,14 +194,16 @@ export class FSManager {
         const dataOffset = count <= 4 ? entryOffset + 8 : tiffOffset + valueOffset;
         
         let str = '';
-        const len = fixedLength || count;
+        const len = fixedLength || Math.min(count, 128);
         for (let j = 0; j < len; j++) {
             if (dataOffset + j >= view.byteLength) break;
             const charCode = view.getUint8(dataOffset + j);
             if (charCode === 0) break; // Null terminator
-            str += String.fromCharCode(charCode);
+            if (charCode > 31 && charCode < 127) {
+                str += String.fromCharCode(charCode);
+            }
         }
-        return str.replace(/\0/g, '').trim();
+        return str.trim();
     }
 
     async scanDirectory(handle, path = '') {
