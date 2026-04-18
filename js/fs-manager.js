@@ -33,10 +33,22 @@ export class FSManager {
         try {
             const buffer = await file.slice(0, 512 * 1024).arrayBuffer();
             const view = new DataView(buffer);
-
+            // 2. Check for JPEG (0xFFD8)
             if (view.byteLength > 2 && view.getUint16(0) === 0xFFD8) {
                 this.parseJpegMetadata(view, metadata);
             } 
+            // 3. Check for PNG (0x89504E47)
+            else if (view.byteLength > 8 && view.getUint32(0) === 0x89504E47) {
+                metadata.make = 'Image';
+                metadata.model = 'PNG';
+                this.parsePngMetadata(view, metadata);
+            }
+            // 4. Check for WebP (RIFF....WEBP)
+            else if (view.byteLength > 12 && view.getUint32(0) === 0x52494646 && view.getUint32(8) === 0x57454250) {
+                metadata.make = 'Image';
+                metadata.model = 'WebP';
+            }
+            // 5. Check for HEIC/MP4/MOV
             else if (this.isIsoMediaFile(view)) {
                 this.parseIsoMediaMetadata(view, metadata);
             }
@@ -92,27 +104,76 @@ export class FSManager {
             metadata.model = 'MP4-MOV';
         }
 
-        // Search for 'mvhd' (date) and 'hdlr' (device info)
-        for (let i = 0; i < Math.min(view.byteLength - 20, view.byteLength); i++) {
-            const tag = view.getUint32(i);
-            if (tag === 0x6D766864) { // 'mvhd'
+        // 1. Search for creation time in 'mvhd' atom
+        for (let i = 0; i < Math.min(view.byteLength - 20, 65536); i++) {
+            if (view.getUint32(i) === 0x6D766864) { // 'mvhd'
                 const version = view.getUint8(i + 4);
-                let creationTime;
-                if (version === 1) {
-                    creationTime = Number(view.getBigUint64(i + 12));
-                } else {
-                    creationTime = view.getUint32(i + 12);
-                }
+                const creationTime = (version === 1) ? Number(view.getBigUint64(i + 12)) : view.getUint32(i + 12);
                 const epoch1904 = new Date('1904-01-01T00:00:00Z').getTime();
                 const date = new Date(epoch1904 + creationTime * 1000);
                 if (date.getFullYear() > 1980) metadata.date = date;
-            } else if (tag === 0x68646C72) { // 'hdlr'
-                // Some device info is often near the handler atom in metadata
-                const componentName = this.readString(view, i + 24, 16);
+                break;
+            }
+        }
+
+        // 2. Deep-scan for manufacturer/model strings (QuickTime/MP4 metadata)
+        // We look for common keys used by iOS and Android
+        const searchRange = Math.min(view.byteLength - 64, 128 * 1024);
+        for (let i = 0; i < searchRange; i++) {
+            const tag = view.getUint32(i);
+            
+            // Look for Apple metadata keys
+            if (tag === 0x6D616B65) { // 'make' (often part of com.apple.quicktime.make)
+                const val = this.readExifString(view, 0, i + 4, false, 32).replace('make', '');
+                if (val.length > 2) metadata.make = val;
+            } else if (tag === 0x6D6F646C) { // 'modl' (often part of com.apple.quicktime.model)
+                const val = this.readExifString(view, 0, i + 4, false, 32).replace('modl', '');
+                if (val.length > 2) metadata.model = val;
+            }
+        }
+
+        // Fallback for handler-based identification
+        if (metadata.make === 'Video') {
+            const hdlrIndex = this.findBytePattern(view, [0x68, 0x64, 0x6C, 0x72]); // 'hdlr'
+            if (hdlrIndex !== -1) {
+                const componentName = this.readString(view, hdlrIndex + 24, 16);
                 if (componentName.includes('Apple')) metadata.make = 'Apple';
             }
         }
     }
+
+    parsePngMetadata(view, metadata) {
+        // PNG stores dates in tEXt chunks. We'll scan the first 8KB for any date-like strings
+        const searchRange = Math.min(view.byteLength - 20, 8192);
+        for (let i = 0; i < searchRange; i++) {
+            if (view.getUint8(i) === 0x32 && view.getUint8(i + 1) === 0x30) { // Starts with '20'
+                const possibleDate = this.readString(view, i, 10);
+                const match = possibleDate.match(/^(\d{4})[:/-](\d{2})[:/-](\d{2})$/);
+                if (match) {
+                    const d = new Date(match[1], match[2] - 1, match[3]);
+                    if (!isNaN(d.getTime()) && d.getFullYear() > 1990) {
+                        metadata.date = d;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    findBytePattern(view, pattern) {
+        for (let i = 0; i < view.byteLength - pattern.length; i++) {
+            let match = true;
+            for (let j = 0; j < pattern.length; j++) {
+                if (view.getUint8(i + j) !== pattern[j]) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) return i;
+        }
+        return -1;
+    }
+
 
     parseJpegMetadata(view, metadata) {
         let offset = 2;
