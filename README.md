@@ -37,6 +37,15 @@
 
 ---
 
+## 🦁 Brave Browser Setup
+
+Brave disables the necessary APIs by default for privacy. To use LocalSort-AI in Brave:
+1.  **Enable File System API:** Go to `brave://flags/#file-system-access-api` and set it to **Enabled**.
+2.  **WebGPU & Shields:** If the AI doesn't load, click the Lion icon (Shields) and set **Fingerprinting Blocking** to "Standard" (not Strict) or disable Shields for this site.
+3.  **Relaunch:** Restart the browser for changes to take effect.
+
+---
+
 ## 🛠 Technical Architecture
 
 * **Core Logic:** Vanilla JavaScript (ES6 Modules)

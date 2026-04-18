@@ -39,7 +39,16 @@ class LocalSortApp {
         // Check for File System Access API support
         if (!('showDirectoryPicker' in window)) {
             this.ui.updateStatusBar('fs-status', '❌ Browser not supported');
-            alert('Your browser does not support the File System Access API. Please use a Chromium-based browser (Chrome, Edge, Brave) and ensure you are in a secure context (HTTPS). If using Brave, check your Shield settings.');
+            
+            const isBrave = navigator.brave && typeof navigator.brave.isBrave === 'function';
+            let msg = 'Your browser does not support the File System Access API. Please use a Chromium-based browser (Chrome, Edge, Brave).';
+            
+            if (isBrave || navigator.userAgent.includes('Brave')) {
+                msg += '\n\nBRAVE USERS: Brave disables this API by default. To enable it:\n1. Go to brave://flags/#file-system-access-api\n2. Set to "Enabled"\n3. Relaunch Brave.';
+            } else {
+                msg += '\n\nEnsure you are in a secure context (HTTPS or localhost).';
+            }
+            alert(msg);
         }
 
         // Initialize AI in background
