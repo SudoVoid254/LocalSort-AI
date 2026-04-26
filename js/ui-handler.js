@@ -31,8 +31,15 @@ export class UIHandler {
         if (!data || img.src.startsWith('blob:')) return;
 
         try {
-            const file = await data.handle.getFile();
-            const url = URL.createObjectURL(file);
+            let url;
+            if (data.thumbnailBlob) {
+                // For videos, use the pre-extracted frame
+                url = URL.createObjectURL(data.thumbnailBlob);
+            } else {
+                // For images, use the original file
+                const file = await data.handle.getFile();
+                url = URL.createObjectURL(file);
+            }
             img.src = url;
             this.activeBlobUrls.set(wrapper, { fileName, url });
         } catch (e) {
@@ -395,6 +402,27 @@ export class UIHandler {
             imgContainer.style.position = 'relative';
             imgContainer.appendChild(img);
             imgContainer.appendChild(badge);
+
+            // Add Video Indicator
+            if (data.isVideo) {
+                const videoBadge = document.createElement('div');
+                videoBadge.className = 'video-badge';
+                videoBadge.innerHTML = '▶';
+                videoBadge.style.position = 'absolute';
+                videoBadge.style.bottom = '5px';
+                videoBadge.style.left = '5px';
+                videoBadge.style.fontSize = '0.8rem';
+                videoBadge.style.background = 'rgba(0, 0, 0, 0.6)';
+                videoBadge.style.color = 'white';
+                videoBadge.style.width = '20px';
+                videoBadge.style.height = '20px';
+                videoBadge.style.borderRadius = '50%';
+                videoBadge.style.display = 'flex';
+                videoBadge.style.alignItems = 'center';
+                videoBadge.style.justifyContent = 'center';
+                videoBadge.style.paddingLeft = '2px'; // Center the triangle
+                imgContainer.appendChild(videoBadge);
+            }
 
             const top3 = (data.allResults || []).slice(0, 3).map(r => `${r.label} (${(r.score * 100).toFixed(0)}%)`).join('\n');
             wrapper.title = `Top Matches:\n${top3}`;

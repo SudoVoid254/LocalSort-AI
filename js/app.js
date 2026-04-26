@@ -208,12 +208,11 @@ class LocalSortApp {
 
     async processSingleFile(fileInfo) {
         const isVideo = fileInfo.name.match(/\.(mp4|mov)$/i);
-        let result, metadata;
-
+        let result, metadata, frameBlob;
         const file = await fileInfo.handle.getFile();
 
         if (isVideo) {
-            const frameBlob = await this.ai.extractVideoFrame(file);
+            frameBlob = await this.ai.extractVideoFrame(file);
             result = await this.ai.labelImage(frameBlob, this.customLabels);
         } else {
             result = await this.ai.labelImage(file, this.customLabels);
@@ -230,7 +229,9 @@ class LocalSortApp {
             handle: fileInfo.handle,
             date: metadata.date,
             make: metadata.make,
-            model: metadata.model
+            model: metadata.model,
+            thumbnailBlob: isVideo ? frameBlob : null,
+            isVideo: isVideo
         });
 
         const msg = `Labeled ${fileInfo.name} as ${result.top.label} (${(result.top.score * 100).toFixed(1)}%)`;
@@ -245,7 +246,9 @@ class LocalSortApp {
             confidence: 0,
             originalPath: fileInfo.path,
             handle: fileInfo.handle,
-            date: null
+            date: null,
+            thumbnailBlob: null,
+            isVideo: fileInfo.name.match(/\.(mp4|mov)$/i)
         });
         const msg = `Error labeling ${fileInfo.name}: ${err.message}`;
         this.ui.updateStatus('label-status', msg);
