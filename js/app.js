@@ -105,8 +105,14 @@ class LocalSortApp {
         // 3. Proposed Structure
         const proposedTree = {};
         for (const [name, data] of this.appState.processedFiles.entries()) {
-            const targetPath = this.config.calculatePath(data) || 'Unorganized';
-            this.addToTree(proposedTree, targetPath, name);
+            const targetPath = this.config.calculatePath(data, name) || 'Unorganized';
+            
+            // Handle full paths with filenames for the tree view
+            const parts = targetPath.split('/');
+            const fileName = parts.pop();
+            const folderPath = parts.join('/');
+            
+            this.addToTree(proposedTree, folderPath, fileName);
         }
         this.ui.renderTree('proposed-tree', proposedTree);
     }
@@ -270,9 +276,9 @@ class LocalSortApp {
             this.ui.updateProgress('execution-progress-bar', ((i + 1) / files.length) * 100);
             this.ui.updateStatus('execution-status', `Moving ${name}...`);
 
-            const targetPath = this.config.calculatePath(data) || 'Unorganized';
+            const targetPath = this.config.calculatePath(data, name) || 'Unorganized';
 
-            const moveResult = await this.fs.moveFile(data.handle, data.originalPath, targetPath);
+            const moveResult = await this.fs.moveFile(data.handle, data.originalPath, targetPath, this.config.duplicateStrategy);
             this.appState.transactionLog.push(moveResult);
         }
 

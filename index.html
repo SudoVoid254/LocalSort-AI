@@ -83,6 +83,16 @@
                         <input type="range" id="threshold-slider" min="0" max="100" value="50" style="width: 100%">
                         <p class="labels-hint">Files below this confidence will go to "Review_Required" folder.</p>
                     </div>
+
+                    <div class="card-inset" style="text-align: left;">
+                        <label class="labels-label">If target file exists:</label>
+                        <select id="duplicate-strategy" class="secondary-btn" style="width: 100%; text-align: left; padding: 10px;">
+                            <option value="rename">Rename (Keep both)</option>
+                            <option value="skip">Skip (Keep original)</option>
+                            <option value="overwrite">Overwrite (Replace target)</option>
+                        </select>
+                        <p class="labels-hint">Choose how to handle collisions in the destination folder.</p>
+                    </div>
                     <div class="actions">
                         <button id="btn-to-preview" class="primary-btn">Preview Structure</button>
                     </div>

@@ -285,23 +285,49 @@ export class FSManager {
         return files;
     }
 
-    async moveFile(sourceHandle, sourcePath, targetPath) {
+    async moveFile(sourceHandle, sourcePath, targetPath, strategy = 'rename') {
         if (!targetPath || targetPath.trim() === "" || targetPath === sourcePath) {
             return { sourcePath, targetPath: sourcePath, status: 'skipped' };
         }
-        const targetDir = await this.ensureDirectoryPath(this.rootHandle, targetPath);
-        const fileName = sourceHandle.name;
+        
+        const parts = targetPath.split('/');
+        const targetFileName = parts.pop();
+        const targetDirRelPath = parts.join('/');
+        
+        const targetDir = await this.ensureDirectoryPath(this.rootHandle, targetDirRelPath);
+        
+        let finalFileName = targetFileName;
+        try {
+            await targetDir.getFileHandle(finalFileName);
+            if (strategy === 'skip') return { sourcePath, targetPath: sourcePath, status: 'skipped' };
+            if (strategy === 'rename') {
+                const dotIndex = targetFileName.lastIndexOf('.');
+                const base = dotIndex === -1 ? targetFileName : targetFileName.substring(0, dotIndex);
+                const ext = dotIndex === -1 ? '' : targetFileName.substring(dotIndex);
+                let counter = 1;
+                while (true) {
+                    finalFileName = `${base}_${counter}${ext}`;
+                    try {
+                        await targetDir.getFileHandle(finalFileName);
+                        counter++;
+                    } catch (e) {
+                        break;
+                    }
+                }
+            }
+        } catch (e) {
+            // File doesn't exist
+        }
 
         try {
             const sourceFile = await sourceHandle.getFile();
-            const newFileHandle = await targetDir.getFileHandle(fileName, { create: true });
+            const newFileHandle = await targetDir.getFileHandle(finalFileName, { create: true });
             const writable = await newFileHandle.createWritable();
             
-            // Stream the content to avoid loading the whole file into RAM
             await sourceFile.stream().pipeTo(writable);
 
             const normalizedSource = sourcePath.replace(/\\/g, '/');
-            const destinationPath = targetPath ? `${targetPath}/${fileName}` : fileName;
+            const destinationPath = targetDirRelPath ? `${targetDirRelPath}/${finalFileName}` : finalFileName;
             
             if (normalizedSource !== destinationPath) {
                 await sourceHandle.remove({ recursive: false });

@@ -163,6 +163,14 @@ export class UIHandler {
                 this.app.config.saveThreshold(val / 100);
             });
         }
+
+        const duplicateStrategy = document.getElementById('duplicate-strategy');
+        if (duplicateStrategy) {
+            duplicateStrategy.value = this.app.config.duplicateStrategy;
+            duplicateStrategy.addEventListener('change', (e) => {
+                this.app.config.saveDuplicateStrategy(e.target.value);
+            });
+        }
     }
 
     updateStepper(state) {
@@ -241,13 +249,34 @@ export class UIHandler {
             div.style.justifyContent = 'center';
 
             div.innerHTML = `
-                <div class="rule-drag-handle" style="cursor: grab; color: var(--text-muted);">☰</div>
-                <div class="rule-row">
-                    <span style="font-size: 0.9rem">If labels match </span>
-                    <input list="label-suggestions" class="rule-input" data-index="${index}" data-field="pattern" value="${rule.pattern}" style="width: 140px; padding: 4px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
-                    <span style="font-size: 0.9rem"> move to </span>
-                    <input type="text" class="rule-input" value="${rule.target}" data-index="${index}" data-field="target" style="width: 180px; padding: 4px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
-                    <button class="secondary-btn btn-sm" data-index="${index}" style="margin-left: 10px; padding: 5px 10px;">Delete</button>
+                <div class="rule-drag-handle" style="cursor: grab; color: var(--text-muted); font-size: 1.2rem;">☰</div>
+                <div class="rule-row" style="flex: 1; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <span style="font-size: 0.9rem">If </span>
+                        <select class="rule-input" data-index="${index}" data-field="mediaType" style="padding: 4px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
+                            <option value="all" ${rule.mediaType === 'all' ? 'selected' : ''}>All Media</option>
+                            <option value="photo" ${rule.mediaType === 'photo' ? 'selected' : ''}>📷 Photos</option>
+                            <option value="video" ${rule.mediaType === 'video' ? 'selected' : ''}>🎥 Videos</option>
+                        </select>
+                        <span style="font-size: 0.9rem"> labels match </span>
+                        <input list="label-suggestions" class="rule-input" data-index="${index}" data-field="pattern" value="${rule.pattern}" style="width: 140px; padding: 4px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;">
+                        <span style="font-size: 0.9rem"> move to </span>
+                        <div style="position: relative; flex: 1; min-width: 200px;">
+                            <input type="text" class="rule-input path-input" value="${rule.target}" data-index="${index}" data-field="target" style="width: 100%; padding: 4px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px;" placeholder="e.g. Organized/{label}/{original}.{ext}">
+                        </div>
+                        <button class="secondary-btn btn-sm" data-index="${index}" style="padding: 5px 10px;">Delete</button>
+                    </div>
+                    
+                    <div class="tag-picker" style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <span style="font-size: 0.7rem; color: var(--text-muted); align-self: center; margin-right: 5px;">Insert Tag:</span>
+                        ${['label', 'year', 'month', 'day', 'make', 'model', 'original', 'ext'].map(tag => `
+                            <button class="tag-chip" data-tag="{${tag}}" data-index="${index}" style="padding: 2px 8px; font-size: 0.7rem; border-radius: 12px; background: rgba(59, 130, 246, 0.1); color: var(--primary); border: 1px solid rgba(59, 130, 246, 0.2); cursor: pointer;">{${tag}}</button>
+                        `).join('')}
+                    </div>
+                    
+                    <div class="path-preview" data-index="${index}" style="font-size: 0.75rem; color: var(--text-muted); font-style: italic; border-left: 2px solid var(--border-color); padding-left: 10px;">
+                        Example: ${this.generatePathPreview(rule.target)}
+                    </div>
                 </div>
             `;
             
@@ -288,6 +317,28 @@ export class UIHandler {
             container.appendChild(div);
         });
 
+        // Add Tag Picker Logic
+        container.querySelectorAll('.tag-chip').forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                const index = e.target.dataset.index;
+                const tag = e.target.dataset.tag;
+                const input = container.querySelector(`.path-input[data-index="${index}"]`);
+                
+                const start = input.selectionStart;
+                const end = input.selectionEnd;
+                const text = input.value;
+                const before = text.substring(0, start);
+                const after = text.substring(end);
+                
+                input.value = before + tag + after;
+                input.focus();
+                input.setSelectionRange(start + tag.length, start + tag.length);
+                
+                // Trigger change to save
+                input.dispatchEvent(new Event('change'));
+            });
+        });
+
         container.querySelectorAll('.rule-input').forEach(input => {
             input.addEventListener('change', (e) => {
                 const index = e.target.dataset.index;
@@ -297,7 +348,22 @@ export class UIHandler {
                 const rules = [...this.app.config.rules];
                 rules[index][field] = value;
                 this.app.config.saveRules(rules);
+                
+                // Update preview if target changed
+                if (field === 'target') {
+                    const preview = container.querySelector(`.path-preview[data-index="${index}"]`);
+                    if (preview) preview.textContent = `Example: ${this.generatePathPreview(value)}`;
+                }
             });
+            
+            // Real-time preview update
+            if (input.dataset.field === 'target') {
+                input.addEventListener('input', (e) => {
+                    const index = e.target.dataset.index;
+                    const preview = container.querySelector(`.path-preview[data-index="${index}"]`);
+                    if (preview) preview.textContent = `Example: ${this.generatePathPreview(e.target.value)}`;
+                });
+            }
         });
 
         container.querySelectorAll('.btn-sm').forEach(btn => {
@@ -463,5 +529,30 @@ export class UIHandler {
         });
 
         return allValid;
+    }
+
+    generatePathPreview(template) {
+        const date = new Date();
+        const dataMap = {
+            year: date.getFullYear().toString(),
+            month: (date.getMonth() + 1).toString().padStart(2, '0'),
+            day: date.getDate().toString().padStart(2, '0'),
+            label: 'Nature',
+            labels: 'Nature, Landscape',
+            make: 'Apple',
+            model: 'iPhone 15',
+            ext: 'jpg',
+            original: 'IMG_4821',
+            confidence: '98%'
+        };
+
+        let path = template.replace(/{(\w+)}/g, (match, key) => {
+            return dataMap[key] || match;
+        });
+
+        if (!path.includes('.jpg') && !path.match(/\.[^.]+$/)) {
+            path = path.endsWith('/') ? `${path}IMG_4821.jpg` : `${path}/IMG_4821.jpg`;
+        }
+        return path;
     }
 }
