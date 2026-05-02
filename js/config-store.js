@@ -65,6 +65,8 @@ export class ConfigStore {
             labels: (fileData.labels || []).join(', '),
             make: fileData.make || 'Unknown',
             model: fileData.model || 'Unknown',
+            city: fileData.city || 'Unknown',
+            country: fileData.country || 'Unknown',
             confidence: (fileData.confidence * 100).toFixed(0) + '%',
             ext: ext,
             original: fileName.replace(/\.[^.]+$/, '')

@@ -6,6 +6,8 @@ import { FSManager } from './fs-manager.js';
 import { UIHandler } from './ui-handler.js';
 import { AIEngine } from './ai-engine.js';
 import { ConfigStore } from './config-store.js';
+import { reverseGeocode } from './geocoder.js';
+import { ZipManager } from './zip-manager.js';
 
 class LocalSortApp {
     constructor() {
@@ -87,6 +89,7 @@ class LocalSortApp {
                 await this.ui.renderGallery(this.appState.processedFiles, this.handleLabelChange.bind(this));
 
                 this.renderTrees();
+                this.ui.showZipButton();
                 resolve();
             }, 100);
         });
@@ -225,6 +228,7 @@ class LocalSortApp {
         }
         
         metadata = await this.fs.extractMetadata(file, fileInfo.name);
+        const location = reverseGeocode(metadata.lat, metadata.lon);
 
         this.appState.processedFiles.set(fileInfo.name, {
             labels: result.results.map(r => r.label),
@@ -236,6 +240,8 @@ class LocalSortApp {
             date: metadata.date,
             make: metadata.make,
             model: metadata.model,
+            city: location.city,
+            country: location.country,
             thumbnailBlob: isVideo ? frameBlob : null,
             isVideo: isVideo
         });
@@ -311,6 +317,28 @@ class LocalSortApp {
         }
 
         setTimeout(() => this.updateState('PREVIEW'), 2000);
+    }
+
+    async handleExportZip() {
+        const files = Array.from(this.appState.processedFiles.entries());
+        const zip = new ZipManager();
+        
+        this.ui.updateStatus('execution-status', 'Creating ZIP archive...');
+        this.ui.updateProgress('execution-progress-bar', 0);
+
+        for (let i = 0; i < files.length; i++) {
+            const [name, data] = files[i];
+            const targetPath = this.config.calculatePath(data, name) || 'Unorganized';
+            await zip.addFile(targetPath, data.handle);
+            this.ui.updateProgress('execution-progress-bar', (i / files.length) * 50); // First 50% for adding
+        }
+
+        const blob = await zip.generate((percent) => {
+            this.ui.updateProgress('execution-progress-bar', 50 + (percent / 2)); // Final 50% for compression
+        });
+
+        zip.download(blob);
+        this.ui.updateStatus('execution-status', 'ZIP downloaded successfully!');
     }
 
     handleLoadPreset(presetId) {

@@ -7,7 +7,17 @@ export class UIHandler {
         this.app = app;
         this.views = {};
         this.activeBlobUrls = new Map(); // element -> { fileName, url }
-        
+
+        this.selectedFiles = new Set();
+        this.lastSelectedIndex = -1;
+        this.visibleFiles = []; // To track order for shift-selection
+        this.virtualConfig = {
+            itemWidth: 120, // 100px + 20px gap/padding roughly
+            itemHeight: 140, // img + input + gaps
+            container: null,
+            renderRange: { start: 0, end: 0 }
+        };
+
         // Initialize IntersectionObserver for lazy loading
         this.observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
@@ -17,9 +27,9 @@ export class UIHandler {
                     this.unloadImage(entry.target);
                 }
             });
-        }, { 
+        }, {
             root: document.getElementById('preview-gallery'),
-            rootMargin: '200px' 
+            rootMargin: '400px'
         });
     }
 
@@ -27,7 +37,7 @@ export class UIHandler {
         const img = wrapper.querySelector('img');
         const fileName = wrapper.dataset.fileName;
         const data = this.app.appState.processedFiles.get(fileName);
-        
+
         if (!data || img.src.startsWith('blob:')) return;
 
         try {
@@ -51,7 +61,7 @@ export class UIHandler {
     unloadImage(wrapper) {
         const img = wrapper.querySelector('img');
         const active = this.activeBlobUrls.get(wrapper);
-        
+
         if (active) {
             URL.revokeObjectURL(active.url);
             this.activeBlobUrls.delete(wrapper);
@@ -101,6 +111,19 @@ export class UIHandler {
             if (confirm('This will move your files. A rollback is possible, but please ensure you have a backup if the files are critical. Proceed?')) {
                 this.app.handleApplyChanges();
             }
+        });
+
+        // Stepper navigation
+        document.querySelectorAll('.step').forEach(stepEl => {
+            stepEl.style.cursor = 'pointer';
+            stepEl.addEventListener('click', () => {
+                const step = stepEl.dataset.step;
+                // Simple safety: only allow jumping if we've already started (processedFiles has data)
+                // or if we're going back to INPUT or CONFIG.
+                if (step === 'INPUT' || this.app.appState.processedFiles.size > 0 || step === 'CONFIG') {
+                    this.app.updateState(step);
+                }
+            });
         });
 
         document.getElementById('btn-add-rule').addEventListener('click', () => {
@@ -156,7 +179,7 @@ export class UIHandler {
         if (thresholdSlider) {
             thresholdSlider.value = this.app.config.confidenceThreshold * 100;
             thresholdValue.textContent = `${thresholdSlider.value}%`;
-            
+
             thresholdSlider.addEventListener('input', (e) => {
                 const val = e.target.value;
                 thresholdValue.textContent = `${val}%`;
@@ -171,6 +194,31 @@ export class UIHandler {
                 this.app.config.saveDuplicateStrategy(e.target.value);
             });
         }
+
+        const btnDownloadZip = document.getElementById('btn-download-zip');
+        if (btnDownloadZip) {
+            btnDownloadZip.addEventListener('click', () => this.app.handleExportZip());
+        }
+
+        const themeSelect = document.getElementById('theme-select');
+        if (themeSelect) {
+            const savedTheme = localStorage.getItem('localsort-theme') || 'midnight';
+            themeSelect.value = savedTheme;
+            this.setTheme(savedTheme);
+            themeSelect.addEventListener('change', (e) => {
+                this.setTheme(e.target.value);
+                localStorage.setItem('localsort-theme', e.target.value);
+            });
+        }
+    }
+
+    setTheme(theme) {
+        document.body.classList.remove('theme-frost', 'theme-obsidian');
+        if (theme !== 'midnight') {
+            document.body.classList.add(`theme-${theme}`);
+        }
+        // Update color-scheme for scrollbars
+        document.documentElement.style.colorScheme = theme === 'frost' ? 'light' : 'dark';
     }
 
     updateStepper(state) {
@@ -183,7 +231,7 @@ export class UIHandler {
         this.views.forEach(view => {
             view.classList.toggle('active', view.id === `view-${state}`);
         });
-        
+
         // Cleanup if moving away from preview
         if (state !== 'PREVIEW' && state !== 'EXECUTION') {
             this.cleanupGallery();
@@ -219,6 +267,11 @@ export class UIHandler {
         if (log) log.innerHTML = '';
     }
 
+    showZipButton() {
+        const btn = document.getElementById('btn-download-zip');
+        if (btn) btn.style.display = 'inline-block';
+    }
+
     renderRules(rules) {
         const container = document.getElementById('rules-container');
         if (!container) return;
@@ -232,8 +285,8 @@ export class UIHandler {
             document.body.appendChild(datalist);
         }
         const labels = Array.from(new Set([
-            '.*', 'unknown', 
-            ...(this.app.customLabels || []), 
+            '.*', 'unknown',
+            ...(this.app.customLabels || []),
             ...this.app.ai.defaultLabels
         ]));
         datalist.innerHTML = labels.map(l => `<option value="${l}">`).join('');
@@ -269,7 +322,7 @@ export class UIHandler {
                     
                     <div class="tag-picker" style="display: flex; gap: 5px; flex-wrap: wrap;">
                         <span style="font-size: 0.7rem; color: var(--text-muted); align-self: center; margin-right: 5px;">Insert Tag:</span>
-                        ${['label', 'year', 'month', 'day', 'make', 'model', 'original', 'ext'].map(tag => `
+                        ${['label', 'year', 'month', 'day', 'make', 'model', 'city', 'country', 'original', 'ext'].map(tag => `
                             <button class="tag-chip" data-tag="{${tag}}" data-index="${index}" style="padding: 2px 8px; font-size: 0.7rem; border-radius: 12px; background: rgba(59, 130, 246, 0.1); color: var(--primary); border: 1px solid rgba(59, 130, 246, 0.2); cursor: pointer;">{${tag}}</button>
                         `).join('')}
                     </div>
@@ -279,7 +332,7 @@ export class UIHandler {
                     </div>
                 </div>
             `;
-            
+
             // Drag events
             div.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', index);
@@ -304,7 +357,7 @@ export class UIHandler {
                 e.preventDefault();
                 const fromIndex = parseInt(e.dataTransfer.getData('text/plain'));
                 const toIndex = index;
-                
+
                 if (fromIndex !== toIndex) {
                     const rules = [...this.app.config.rules];
                     const [movedRule] = rules.splice(fromIndex, 1);
@@ -323,17 +376,17 @@ export class UIHandler {
                 const index = e.target.dataset.index;
                 const tag = e.target.dataset.tag;
                 const input = container.querySelector(`.path-input[data-index="${index}"]`);
-                
+
                 const start = input.selectionStart;
                 const end = input.selectionEnd;
                 const text = input.value;
                 const before = text.substring(0, start);
                 const after = text.substring(end);
-                
+
                 input.value = before + tag + after;
                 input.focus();
                 input.setSelectionRange(start + tag.length, start + tag.length);
-                
+
                 // Trigger change to save
                 input.dispatchEvent(new Event('change'));
             });
@@ -348,14 +401,14 @@ export class UIHandler {
                 const rules = [...this.app.config.rules];
                 rules[index][field] = value;
                 this.app.config.saveRules(rules);
-                
+
                 // Update preview if target changed
                 if (field === 'target') {
                     const preview = container.querySelector(`.path-preview[data-index="${index}"]`);
                     if (preview) preview.textContent = `Example: ${this.generatePathPreview(value)}`;
                 }
             });
-            
+
             // Real-time preview update
             if (input.dataset.field === 'target') {
                 input.addEventListener('input', (e) => {
@@ -408,26 +461,26 @@ export class UIHandler {
     async renderGallery(processedFiles, onLabelChange) {
         const container = document.getElementById('preview-gallery');
         if (!container) return;
-        
-        // 1. Cancel previous render and cleanup old URLs
+        this.virtualConfig.container = container;
+
         this.currentRenderId = (this.currentRenderId || 0) + 1;
         const myRenderId = this.currentRenderId;
-        
+
         this.cleanupGallery();
-        
+
         const searchTerm = document.getElementById('preview-search')?.value.toLowerCase() || '';
         const confidenceFilter = document.getElementById('filter-confidence')?.value || '0';
 
-        // 2. Fragment for better performance
-        const fragment = document.createDocumentFragment();
+        this.visibleFiles = [];
+        this.allProcessedFiles = processedFiles; // Store reference for virtual scroll
+        this.onLabelChange = onLabelChange;
 
         for (const [fileName, data] of processedFiles.entries()) {
             if (myRenderId !== this.currentRenderId) return;
 
-            // Apply filtering
             const label = (data.topLabel || '').toLowerCase();
             const name = fileName.toLowerCase();
-            
+
             if (searchTerm && !label.includes(searchTerm) && !name.includes(searchTerm)) continue;
 
             if (confidenceFilter === 'low') {
@@ -436,81 +489,151 @@ export class UIHandler {
                 const minConfidence = parseFloat(confidenceFilter);
                 if (data.confidence < minConfidence) continue;
             }
-
-            const wrapper = document.createElement('div');
-            wrapper.className = 'gallery-item-wrapper';
-            wrapper.dataset.fileName = fileName;
-            wrapper.style.position = 'relative';
-
-            const img = document.createElement('img');
-            img.className = 'gallery-item';
-            img.style.width = '100px';
-            img.style.height = '100px';
-            img.style.objectFit = 'cover';
-            img.style.cursor = 'pointer';
-            img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'; // Placeholder
-
-            // Add confidence badge
-            const badge = document.createElement('div');
-            badge.className = 'confidence-badge';
-            const confidencePercent = (data.confidence * 100).toFixed(0);
-            badge.textContent = `${confidencePercent}%`;
-            badge.style.position = 'absolute';
-            badge.style.top = '5px';
-            badge.style.right = '5px';
-            badge.style.fontSize = '0.6rem';
-            badge.style.padding = '2px 4px';
-            badge.style.borderRadius = '4px';
-            badge.style.background = data.confidence > 0.7 ? 'rgba(34, 197, 94, 0.8)' : 'rgba(239, 68, 68, 0.8)';
-            badge.style.color = 'white';
-
-            const imgContainer = document.createElement('div');
-            imgContainer.style.position = 'relative';
-            imgContainer.appendChild(img);
-            imgContainer.appendChild(badge);
-
-            // Add Video Indicator
-            if (data.isVideo) {
-                const videoBadge = document.createElement('div');
-                videoBadge.className = 'video-badge';
-                videoBadge.innerHTML = '▶';
-                videoBadge.style.position = 'absolute';
-                videoBadge.style.bottom = '5px';
-                videoBadge.style.left = '5px';
-                videoBadge.style.fontSize = '0.8rem';
-                videoBadge.style.background = 'rgba(0, 0, 0, 0.6)';
-                videoBadge.style.color = 'white';
-                videoBadge.style.width = '20px';
-                videoBadge.style.height = '20px';
-                videoBadge.style.borderRadius = '50%';
-                videoBadge.style.display = 'flex';
-                videoBadge.style.alignItems = 'center';
-                videoBadge.style.justifyContent = 'center';
-                videoBadge.style.paddingLeft = '2px'; // Center the triangle
-                imgContainer.appendChild(videoBadge);
-            }
-
-            const top3 = (data.allResults || []).slice(0, 3).map(r => `${r.label} (${(r.score * 100).toFixed(0)}%)`).join('\n');
-            wrapper.title = `Top Matches:\n${top3}`;
-
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.className = 'gallery-input';
-            input.value = data.topLabel || data.labels[0] || '';
-            input.addEventListener('change', (e) => onLabelChange(fileName, e.target.value));
-
-            wrapper.appendChild(imgContainer);
-            wrapper.appendChild(input);
-            
-            this.observer.observe(wrapper);
-            fragment.appendChild(wrapper);
-            
-            if (fragment.children.length % 50 === 0) {
-                container.appendChild(fragment);
-                await new Promise(requestAnimationFrame);
-            }
+            this.visibleFiles.push(fileName);
         }
+
+        this.selectedFiles.clear();
+        this.updateBulkActionBar();
+        this.setupVirtualScroll();
+        this.updateVirtualDisplay();
+    }
+
+    setupVirtualScroll() {
+        const container = this.virtualConfig.container;
+        if (!container.dataset.virtualInit) {
+            container.addEventListener('scroll', () => this.updateVirtualDisplay());
+            window.addEventListener('resize', () => this.updateVirtualDisplay());
+            container.dataset.virtualInit = 'true';
+        }
+    }
+
+    updateVirtualDisplay() {
+        if (!this.virtualConfig.container || this.visibleFiles.length === 0) return;
+
+        const container = this.virtualConfig.container;
+        const scrollTop = container.scrollTop;
+        const containerHeight = container.clientHeight;
+        const containerWidth = container.clientWidth;
+
+        const itemsPerRow = Math.floor(containerWidth / this.virtualConfig.itemWidth) || 1;
+        const totalRows = Math.ceil(this.visibleFiles.length / itemsPerRow);
+        const totalHeight = totalRows * this.virtualConfig.itemHeight;
+
+        // Ensure container has correct scroll height
+        let spacer = container.querySelector('.virtual-spacer');
+        if (!spacer) {
+            spacer = document.createElement('div');
+            spacer.className = 'virtual-spacer';
+            container.appendChild(spacer);
+        }
+        spacer.style.height = `${totalHeight}px`;
+        spacer.style.width = '1px';
+        spacer.style.position = 'absolute';
+        spacer.style.top = '0';
+        spacer.style.left = '0';
+        spacer.style.zIndex = '-1';
+
+        const startRow = Math.floor(scrollTop / this.virtualConfig.itemHeight);
+        const endRow = Math.ceil((scrollTop + containerHeight) / this.virtualConfig.itemHeight);
+
+        const startIndex = startRow * itemsPerRow;
+        const endIndex = Math.min(endRow * itemsPerRow + itemsPerRow, this.visibleFiles.length);
+
+        if (this.virtualConfig.renderRange.start === startIndex && this.virtualConfig.renderRange.end === endIndex) return;
+
+        this.virtualConfig.renderRange = { start: startIndex, end: endIndex };
+
+        // Optimized rendering: only update if range changed
+        const fragment = document.createDocumentFragment();
+        fragment.appendChild(spacer);
+
+        for (let i = startIndex; i < endIndex; i++) {
+            const fileName = this.visibleFiles[i];
+            const data = this.allProcessedFiles.get(fileName);
+            const wrapper = this.createGalleryItem(fileName, data, i);
+
+            const row = Math.floor(i / itemsPerRow);
+            const col = i % itemsPerRow;
+            wrapper.style.position = 'absolute';
+            wrapper.style.top = `${row * this.virtualConfig.itemHeight}px`;
+            wrapper.style.left = `${col * this.virtualConfig.itemWidth}px`;
+            wrapper.style.width = `${this.virtualConfig.itemWidth}px`;
+            wrapper.style.height = `${this.virtualConfig.itemHeight}px`;
+
+            fragment.appendChild(wrapper);
+            this.observer.observe(wrapper);
+        }
+
+        // We can't use innerHTML = '' because of the spacer, but we can clear everything else
+        const children = Array.from(container.children);
+        children.forEach(child => {
+            if (child !== spacer) container.removeChild(child);
+        });
         container.appendChild(fragment);
+    }
+
+    createGalleryItem(fileName, data, index) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'gallery-item-wrapper';
+        if (this.selectedFiles.has(fileName)) wrapper.classList.add('selected');
+        wrapper.dataset.fileName = fileName;
+        wrapper.dataset.index = index;
+
+        wrapper.addEventListener('click', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+
+            // If Ctrl/Shift is held, or we already have a selection, toggle selection
+            if (e.ctrlKey || e.metaKey || e.shiftKey || this.selectedFiles.size > 0) {
+                if (e.shiftKey && this.lastSelectedIndex !== -1) {
+                    this.selectRange(this.lastSelectedIndex, index);
+                } else {
+                    this.toggleSelection(fileName, true);
+                    this.lastSelectedIndex = index;
+                }
+            } else {
+                // Otherwise, open Lightbox
+                this.showLightbox(fileName);
+            }
+        });
+
+        const imgContainer = document.createElement('div');
+        imgContainer.style.position = 'relative';
+        imgContainer.style.width = '100px';
+        imgContainer.style.height = '100px';
+        imgContainer.style.margin = '0 auto';
+
+        const img = document.createElement('img');
+        img.className = 'gallery-item';
+        img.style.width = '100%';
+        img.style.height = '100%';
+        img.style.objectFit = 'cover';
+        img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+        const badge = document.createElement('div');
+        badge.className = 'confidence-badge';
+        badge.textContent = `${(data.confidence * 100).toFixed(0)}%`;
+        badge.style.background = data.confidence > 0.7 ? 'rgba(34, 197, 94, 0.8)' : 'rgba(239, 68, 68, 0.8)';
+
+        imgContainer.appendChild(img);
+        imgContainer.appendChild(badge);
+
+        if (data.isVideo) {
+            const videoBadge = document.createElement('div');
+            videoBadge.className = 'video-badge';
+            videoBadge.innerHTML = '▶';
+            imgContainer.appendChild(videoBadge);
+        }
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'gallery-input';
+        input.value = data.topLabel || data.labels[0] || '';
+        input.addEventListener('change', (e) => this.onLabelChange(fileName, e.target.value));
+
+        wrapper.appendChild(imgContainer);
+        wrapper.appendChild(input);
+
+        return wrapper;
     }
 
 
@@ -531,6 +654,155 @@ export class UIHandler {
         return allValid;
     }
 
+    toggleSelection(fileName, isMulti) {
+        if (!isMulti) {
+            this.selectedFiles.clear();
+            document.querySelectorAll('.gallery-item-wrapper.selected').forEach(el => el.classList.remove('selected'));
+        }
+
+        if (this.selectedFiles.has(fileName)) {
+            this.selectedFiles.delete(fileName);
+            document.querySelector(`.gallery-item-wrapper[data-file-name="${CSS.escape(fileName)}"]`)?.classList.remove('selected');
+        } else {
+            this.selectedFiles.add(fileName);
+            document.querySelector(`.gallery-item-wrapper[data-file-name="${CSS.escape(fileName)}"]`)?.classList.add('selected');
+        }
+        this.updateBulkActionBar();
+    }
+
+    selectRange(start, end) {
+        const [low, high] = start < end ? [start, end] : [end, start];
+        for (let i = low; i <= high; i++) {
+            const fileName = this.visibleFiles[i];
+            this.selectedFiles.add(fileName);
+            document.querySelector(`.gallery-item-wrapper[data-index="${i}"]`)?.classList.add('selected');
+        }
+        this.updateBulkActionBar();
+    }
+
+    updateBulkActionBar() {
+        let bar = document.getElementById('bulk-action-bar');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'bulk-action-bar';
+            bar.className = 'bulk-bar';
+            document.getElementById('view-PREVIEW').appendChild(bar);
+        }
+
+        if (this.selectedFiles.size > 0) {
+            bar.classList.add('active');
+            bar.innerHTML = `
+                <div class="bulk-content">
+                    <span>${this.selectedFiles.size} files selected</span>
+                    <div class="bulk-actions-group">
+                        <input type="text" id="bulk-label-input" placeholder="Set label for all..." style="padding: 6px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--bg-color); color: var(--text-main);">
+                        <button id="btn-bulk-apply" class="primary-btn btn-sm">Apply</button>
+                        <button id="btn-bulk-clear" class="secondary-btn btn-sm">Clear</button>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('btn-bulk-apply').addEventListener('click', () => {
+                const label = document.getElementById('bulk-label-input').value;
+                if (label) {
+                    this.selectedFiles.forEach(fileName => {
+                        this.app.handleLabelChange(fileName, label);
+                        // Update UI immediately
+                        const input = document.querySelector(`.gallery-item-wrapper[data-file-name="${CSS.escape(fileName)}"] .gallery-input`);
+                        if (input) input.value = label;
+                    });
+                    this.addLogEntry(`Bulk updated ${this.selectedFiles.size} files to "${label}"`);
+                    this.selectedFiles.clear();
+                    document.querySelectorAll('.gallery-item-wrapper.selected').forEach(el => el.classList.remove('selected'));
+                    this.updateBulkActionBar();
+                }
+            });
+
+            document.getElementById('btn-bulk-clear').addEventListener('click', () => {
+                this.selectedFiles.clear();
+                document.querySelectorAll('.gallery-item-wrapper.selected').forEach(el => el.classList.remove('selected'));
+                this.updateBulkActionBar();
+            });
+        } else {
+            bar.classList.remove('active');
+        }
+    }
+
+    async showLightbox(fileName) {
+        const data = this.app.appState.processedFiles.get(fileName);
+        if (!data) return;
+
+        const file = data.handle.getFile ? await data.handle.getFile() : data.file;
+        const blobUrl = URL.createObjectURL(file);
+
+        let modal = document.getElementById('lightbox-modal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'lightbox-modal';
+            modal.className = 'modal';
+            modal.innerHTML = '<div class="modal-content"><span class="close-modal">&times;</span><div id="lightbox-content"></div></div>';
+            document.body.appendChild(modal);
+        }
+
+        modal.classList.add('active');
+        const contentArea = modal.querySelector('.modal-content');
+
+        const confidenceList = (data.allResults || [])
+            .map(r => `
+                <div class="confidence-row">
+                    <span class="label">${r.label}</span>
+                    <div class="score-bar-bg"><div class="score-bar" style="width: ${r.score * 100}%"></div></div>
+                    <span class="percent">${(r.score * 100).toFixed(1)}%</span>
+                </div>
+            `).join('');
+
+        contentArea.innerHTML = `
+            <span class="close-modal">&times;</span>
+            <div class="lightbox-layout">
+                <div class="lightbox-main">
+                    ${data.isVideo ? `
+                        <video controls autoplay loop style="max-width: 100%; max-height: 80vh; border-radius: 8px;">
+                            <source src="${blobUrl}" type="video/mp4">
+                        </video>
+                    ` : `
+                        <img src="${blobUrl}" style="max-width: 100%; max-height: 80vh; border-radius: 8px; object-fit: contain;">
+                    `}
+                </div>
+                <div class="lightbox-sidebar">
+                    <h3>File Details</h3>
+                    <p class="file-name">${fileName}</p>
+                    <div class="metadata-grid">
+                        <div class="meta-item"><span>Type</span><strong>${data.isVideo ? 'Video' : 'Photo'}</strong></div>
+                        <div class="meta-item"><span>Date</span><strong>${data.date ? data.date.toLocaleDateString() : 'Unknown'}</strong></div>
+                        <div class="meta-item"><span>Camera</span><strong>${data.make} ${data.model}</strong></div>
+                        <div class="meta-item"><span>Location</span><strong>${data.city}, ${data.country}</strong></div>
+                    </div>
+                    
+                    <h3 style="margin-top: 20px;">AI Analysis</h3>
+                    <div class="confidence-list">
+                        ${confidenceList}
+                    </div>
+
+                    <div class="lightbox-actions" style="margin-top: 20px;">
+                        <label>Override Label:</label>
+                        <input type="text" id="lightbox-label-input" value="${data.topLabel}" style="width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--border-color);">
+                        <button id="btn-save-lightbox" class="primary-btn" style="width: 100%; margin-top: 10px;">Save & Close</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        contentArea.querySelector('.close-modal').onclick = () => modal.classList.remove('active');
+        modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('active'); };
+
+        document.getElementById('btn-save-lightbox').onclick = () => {
+            const newLabel = document.getElementById('lightbox-label-input').value;
+            this.app.handleLabelChange(fileName, newLabel);
+            modal.classList.remove('active');
+            this.updateVirtualDisplay(); // Refresh gallery
+        };
+    }
+
     generatePathPreview(template) {
         const date = new Date();
         const dataMap = {
@@ -541,6 +813,8 @@ export class UIHandler {
             labels: 'Nature, Landscape',
             make: 'Apple',
             model: 'iPhone 15',
+            city: 'Athens',
+            country: 'Greece',
             ext: 'jpg',
             original: 'IMG_4821',
             confidence: '98%'

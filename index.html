@@ -10,6 +10,7 @@
     <link rel="icon" type="image/png" href="icons/icon-192.png">
     <!-- Suppress some Permissions-Policy warnings if possible -->
     <meta http-equiv="Permissions-Policy" content="interest-cohort=()">
+    <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 </head>
 <body>
     <div id="app">
@@ -22,6 +23,13 @@
                 <div class="step" data-step="PREVIEW">Preview</div>
                 <div class="step" data-step="EXECUTION">Execution</div>
             </nav>
+            <div class="header-actions">
+                <select id="theme-select" class="secondary-btn btn-sm">
+                    <option value="midnight">Midnight</option>
+                    <option value="frost">Frost</option>
+                    <option value="obsidian">Obsidian</option>
+                </select>
+            </div>
         </header>
 
         <main id="view-container">
@@ -145,6 +153,7 @@
                     <div id="execution-status">Moving files...</div>
                     <div class="actions">
                         <button id="btn-rollback" class="secondary-btn">Rollback Changes</button>
+                        <button id="btn-download-zip" class="secondary-btn" style="display: none;">Download Organized ZIP</button>
                         <button id="btn-finish-execution" class="primary-btn">Done</button>
                     </div>
                 </div>
@@ -157,6 +166,14 @@
                 <span id="ai-status">🧠 AI: Offline</span>
             </div>
         </footer>
+
+        <!-- Lightbox Modal -->
+        <div id="lightbox-modal" class="modal">
+            <div class="modal-content">
+                <span class="close-modal">&times;</span>
+                <div id="lightbox-content"></div>
+            </div>
+        </div>
     </div>
 
     <script type="module" src="js/app.js"></script>

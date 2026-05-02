@@ -25,7 +25,13 @@ export class FSManager {
      * @returns {Promise<Object>} Metadata object
      */
     async extractMetadata(file, fileName) {
-        const metadata = { date: null, make: 'Unknown', model: 'Unknown' };
+        const metadata = { 
+            date: null, 
+            make: 'Unknown', 
+            model: 'Unknown',
+            lat: null,
+            lon: null
+        };
         
         const nameDate = this.parseDateFromFilename(fileName);
         if (nameDate) metadata.date = nameDate;
@@ -116,7 +122,21 @@ export class FSManager {
             }
         }
 
-        // 2. Deep-scan for manufacturer/model strings (QuickTime/MP4 metadata)
+        // 2. Search for GPS in '©xyz' atom (Common in MOV/MP4)
+        for (let i = 0; i < Math.min(view.byteLength - 20, 65536); i++) {
+            if (view.getUint32(i) === 0xA978797A) { // '©xyz'
+                const size = view.getUint16(i - 2); // Atom size is usually 4 bytes before, but we'll be careful
+                const dataStr = this.readString(view, i + 4, 32);
+                const match = dataStr.match(/([+-]\d+\.\d+)([+-]\d+\.\d+)/);
+                if (match) {
+                    metadata.lat = parseFloat(match[1]);
+                    metadata.lon = parseFloat(match[2]);
+                }
+                break;
+            }
+        }
+
+        // 3. Deep-scan for manufacturer/model strings (QuickTime/MP4 metadata)
         // We look for common keys used by iOS and Android
         const searchRange = Math.min(view.byteLength - 64, 128 * 1024);
         for (let i = 0; i < searchRange; i++) {
@@ -229,6 +249,9 @@ export class FSManager {
             } else if (tag === 0x8769) { // Exif IFD Pointer
                 const subIfdOffset = view.getUint32(entryOffset + 8, isLittleEndian);
                 this.parseIFD(view, tiffOffset, subIfdOffset, isLittleEndian, metadata, depth + 1);
+            } else if (tag === 0x8825) { // GPS IFD Pointer
+                const gpsIfdOffset = view.getUint32(entryOffset + 8, isLittleEndian);
+                this.parseGPSIFD(view, tiffOffset, gpsIfdOffset, isLittleEndian, metadata);
             } else if (tag === 0x9003) { // DateTimeOriginal
                 const dateStr = this.readExifString(view, tiffOffset, entryOffset, isLittleEndian, 19);
                 const parts = dateStr.split(/[: ]/);
@@ -238,7 +261,7 @@ export class FSManager {
                 }
             }
         }
-
+        
         // Follow the 'Next IFD' pointer
         const nextIfdPointerOffset = ifdStart + 2 + (numEntries * 12);
         if (nextIfdPointerOffset + 4 <= view.byteLength) {
@@ -247,6 +270,46 @@ export class FSManager {
                 this.parseIFD(view, tiffOffset, nextIfdOffset, isLittleEndian, metadata, depth + 1);
             }
         }
+    }
+
+    parseGPSIFD(view, tiffOffset, gpsIfdOffset, isLittleEndian, metadata) {
+        const ifdStart = tiffOffset + gpsIfdOffset;
+        if (ifdStart + 2 > view.byteLength) return;
+        const numEntries = view.getUint16(ifdStart, isLittleEndian);
+
+        let lat, lon, latRef, lonRef;
+
+        for (let i = 0; i < numEntries; i++) {
+            const entryOffset = ifdStart + 2 + (i * 12);
+            const tag = view.getUint16(entryOffset, isLittleEndian);
+            
+            if (tag === 1) latRef = this.readExifString(view, tiffOffset, entryOffset, isLittleEndian, 1);
+            else if (tag === 2) lat = this.readGPSCoordinate(view, tiffOffset, entryOffset, isLittleEndian);
+            else if (tag === 3) lonRef = this.readExifString(view, tiffOffset, entryOffset, isLittleEndian, 1);
+            else if (tag === 4) lon = this.readGPSCoordinate(view, tiffOffset, entryOffset, isLittleEndian);
+        }
+
+        if (lat && latRef) metadata.lat = (latRef === 'N' ? 1 : -1) * lat;
+        if (lon && lonRef) metadata.lon = (lonRef === 'E' ? 1 : -1) * lon;
+    }
+
+    readGPSCoordinate(view, tiffOffset, entryOffset, isLittleEndian) {
+        const valueOffset = view.getUint32(entryOffset + 8, isLittleEndian);
+        const dataOffset = tiffOffset + valueOffset;
+        
+        // 3 rationals (degrees, minutes, seconds)
+        const d_num = view.getUint32(dataOffset, isLittleEndian);
+        const d_den = view.getUint32(dataOffset + 4, isLittleEndian);
+        const m_num = view.getUint32(dataOffset + 8, isLittleEndian);
+        const m_den = view.getUint32(dataOffset + 12, isLittleEndian);
+        const s_num = view.getUint32(dataOffset + 16, isLittleEndian);
+        const s_den = view.getUint32(dataOffset + 20, isLittleEndian);
+
+        const degrees = d_num / d_den;
+        const minutes = m_num / m_den;
+        const seconds = s_num / s_den;
+
+        return degrees + (minutes / 60) + (seconds / 3600);
     }
 
     readExifString(view, tiffOffset, entryOffset, isLittleEndian, fixedLength = null) {
